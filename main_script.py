@@ -1,4 +1,5 @@
 import tkinter as tk
+from tkinter import ttk
 from tkinter.scrolledtext import ScrolledText
 from datetime import datetime
 import requests
@@ -8,6 +9,7 @@ import psutil
 import os
 from requests.exceptions import ConnectionError, Timeout, SSLError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
+from tkhtmlview import HTMLLabel
 
 # 忽略SSL警告
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -17,24 +19,40 @@ class App:
         self.root = root
         self.root.title("Script Runner")
         
-        self.text_area = ScrolledText(root, wrap=tk.WORD, width=100, height=30)
-        self.text_area.pack(pady=10, padx=10)
+        self.style = ttk.Style()
+        self.style.configure('TButton', font=('Helvetica', 12))
+        self.style.configure('TLabel', font=('Helvetica', 12))
+        self.style.configure('TEntry', font=('Helvetica', 12))
         
-        self.id_entry_label = tk.Label(root, text="Enter Player ID:")
-        self.id_entry_label.pack()
+        self.announcement_label = ttk.Label(root, text="Announcement:", anchor='w')
+        self.announcement_label.pack(fill='x', padx=10, pady=5)
         
-        self.id_entry = tk.Entry(root, width=50)
+        self.announcement_html = HTMLLabel(root, html="<p>Loading announcement...</p>", width=80, height=10)
+        self.announcement_html.pack(fill='x', padx=10, pady=5)
+        
+        self.refresh_button = ttk.Button(root, text="Refresh Announcement", command=self.refresh_announcement)
+        self.refresh_button.pack(pady=5)
+        
+        self.id_entry_label = ttk.Label(root, text="Enter Player ID:")
+        self.id_entry_label.pack(pady=5)
+        
+        self.id_entry = ttk.Entry(root, width=50)
         self.id_entry.pack(pady=5)
         
-        self.add_id_button = tk.Button(root, text="Add ID", command=self.add_id)
+        self.add_id_button = ttk.Button(root, text="Add ID", command=self.add_id)
         self.add_id_button.pack(pady=5)
         
-        self.run_button = tk.Button(root, text="Run Script", command=self.run_script)
+        self.run_button = ttk.Button(root, text="Run Script", command=self.run_script)
         self.run_button.pack(pady=5)
+        
+        self.text_area = ScrolledText(root, wrap=tk.WORD, width=100, height=20, font=('Helvetica', 12))
+        self.text_area.pack(pady=10, padx=10)
         
         self.create_file_if_not_exists('ids.txt', '示例玩家ID\n')
         self.create_file_if_not_exists('results.txt')
         self.create_file_if_not_exists('ip.txt')
+        
+        self.refresh_announcement()
 
     def create_file_if_not_exists(self, filename, content=""):
         if not os.path.exists(filename):
@@ -162,6 +180,16 @@ class App:
 
         self.log(f"当前内存使用: {mem_info.rss / 1024 ** 2:.2f} MB")
         self.log(f"当前CPU使用: {cpu_usage:.2f} %")
+
+    def refresh_announcement(self):
+        url = 'https://example.com/announcement.html'  # 替换为实际的公告URL
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            announcement = response.text.strip()
+            self.announcement_html.set_html(announcement)
+        except Exception as e:
+            self.log(f"获取公告失败: {e}")
 
     def run_script(self):
         ids_and_passwords = self.read_ids_and_passwords('ids.txt')
