@@ -10,6 +10,7 @@ import os
 from requests.exceptions import ConnectionError, Timeout, SSLError
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 from tkhtmlview import HTMLLabel
+import tkinter.messagebox
 
 # 忽略SSL警告
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
@@ -17,32 +18,34 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Script Runner")
+        self.root.title("XMG游戏团队")
+        
+        self.show_welcome_message()  # 显示欢迎消息
         
         self.style = ttk.Style()
         self.style.configure('TButton', font=('Helvetica', 12))
         self.style.configure('TLabel', font=('Helvetica', 12))
         self.style.configure('TEntry', font=('Helvetica', 12))
         
-        self.announcement_label = ttk.Label(root, text="Announcement:", anchor='w')
+        self.announcement_label = ttk.Label(root, text="公告:", anchor='w')
         self.announcement_label.pack(fill='x', padx=10, pady=5)
         
         self.announcement_html = HTMLLabel(root, html="<p>Loading announcement...</p>", width=80, height=10)
         self.announcement_html.pack(fill='x', padx=10, pady=5)
         
-        self.refresh_button = ttk.Button(root, text="Refresh Announcement", command=self.refresh_announcement)
+        self.refresh_button = ttk.Button(root, text="刷新公告", command=self.refresh_announcement)
         self.refresh_button.pack(pady=5)
         
-        self.id_entry_label = ttk.Label(root, text="Enter Player ID:")
+        self.id_entry_label = ttk.Label(root, text="输入玩家ID:")
         self.id_entry_label.pack(pady=5)
         
         self.id_entry = ttk.Entry(root, width=50)
         self.id_entry.pack(pady=5)
         
-        self.add_id_button = ttk.Button(root, text="Add ID", command=self.add_id)
+        self.add_id_button = ttk.Button(root, text="添加ID", command=self.add_id)
         self.add_id_button.pack(pady=5)
         
-        self.run_button = ttk.Button(root, text="Run Script", command=self.run_script)
+        self.run_button = ttk.Button(root, text="运行脚本", command=self.run_script)
         self.run_button.pack(pady=5)
         
         self.text_area = ScrolledText(root, wrap=tk.WORD, width=100, height=20, font=('Helvetica', 12))
@@ -60,19 +63,20 @@ class App:
                 file.write(content)
 
     def log(self, message):
-        self.text_area.insert(tk.END, message + '\n')
-        self.text_area.see(tk.END)
-        self.root.update()
+        if "成功" in message or "失败" in message:  # 仅记录成功或失败的消息
+            self.text_area.insert(tk.END, message + '\n')
+            self.text_area.see(tk.END)
+            self.root.update()
 
     def add_id(self):
         player_id = self.id_entry.get()
         if player_id:
             with open('ids.txt', 'a') as file:
                 file.write(player_id + '\n')
-            self.log(f"Added Player ID: {player_id}")
+            self.log(f"添加玩家ID: {player_id}")
             self.id_entry.delete(0, tk.END)
         else:
-            self.log("No Player ID entered")
+            self.log("未输入玩家ID")
 
     def read_ids_and_passwords(self, filename):
         ids_and_passwords = []
@@ -182,7 +186,7 @@ class App:
         self.log(f"当前CPU使用: {cpu_usage:.2f} %")
 
     def refresh_announcement(self):
-        url = 'https://example.com/announcement.html'  # 替换为实际的公告URL
+        url = 'http://qd.xmg9.top/announcement.html'  # 公告URL
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
@@ -251,6 +255,10 @@ class App:
 
             # 添加延迟，模拟人类操作
             time.sleep(random.randint(3, 6))
+
+    def show_welcome_message(self):
+        welcome_message = "欢迎使用XMG游戏团队工具。\n请在下面的输入框中输入玩家ID并点击'Add ID'按钮添加，然后点击'Run Script'按钮运行脚本。"
+        tkinter.messagebox.showinfo("欢迎", welcome_message)
 
 if __name__ == '__main__':
     root = tk.Tk()
