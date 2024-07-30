@@ -81,7 +81,7 @@ def read_results(filename):
                 result_date = parts[0].split('T')[0]
                 player_id = parts[3]  # 假设ID总是位于第四个位置
                 if result_date == current_date:
-                    if "签到成功" in line or ("第" in line and "天签到成功" in line) or "没有可领取的每日签到任务或任务已完成" in line或"重试没有可领取的每日签到任务或任务已完成" in line:
+                    if "签到成功" in line or ("第" in line and "天签到成功" in line) or "没有可领取的每日签到任务或任务已完成" in line or "重试没有可领取的每日签到任务或任务已完成" in line:
                         successful_ids.add(player_id)
                     else:
                         failed_ids.add(player_id)
