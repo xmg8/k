@@ -181,7 +181,7 @@ class App:
         webbrowser.open('http://www.xmg888.top')
 
     def refresh_announcement(self):
-        url = 'https://yourusername.github.io/xmg-announcement/announcement.html'  # 更新为 GitHub Pages 的 URL
+        url = 'https://xmg8.github.io/kop/'  # 更新为 GitHub Pages 的 URL
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
