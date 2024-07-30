@@ -10,4 +10,5 @@ pyinstaller==6.0.0
 pyinstaller-hooks-contrib==2024.7
 pywin32==306
 requests==2.31.0
-tkinterhtml
+psutil
+tkhtmlview
