@@ -21,50 +21,50 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("XMG游戏团队")
-        
+
         self.running = False  # 脚本运行状态
-        
+
         self.show_welcome_message()  # 显示欢迎消息
-        
+
         self.style = ttk.Style()
         self.style.configure('TButton', font=('Helvetica', 12))
         self.style.configure('TLabel', font=('Helvetica', 12))
         self.style.configure('TEntry', font=('Helvetica', 12))
-        
+
         self.announcement_label = ttk.Label(root, text="公告:", anchor='w')
         self.announcement_label.pack(fill='x', padx=10, pady=5)
-        
+
         self.announcement_html = HTMLLabel(root, html="<p>Loading announcement...</p>", width=80, height=10)
         self.announcement_html.pack(fill='x', padx=10, pady=5)
-        
+
         self.refresh_button = ttk.Button(root, text="刷新公告", command=self.refresh_announcement)
         self.refresh_button.pack(pady=5)
-        
+
         self.id_entry_label = ttk.Label(root, text="输入玩家ID:")
         self.id_entry_label.pack(pady=5)
-        
+
         self.id_entry = ttk.Entry(root, width=50)
         self.id_entry.pack(pady=5)
-        
+
         self.add_id_button = ttk.Button(root, text="添加ID", command=self.add_id)
         self.add_id_button.pack(pady=5)
-        
+
         self.start_button = ttk.Button(root, text="开始领取", command=self.start_script)
         self.start_button.pack(pady=5)
-        
+
         self.stop_button = ttk.Button(root, text="停止领取", command=self.stop_script)
         self.stop_button.pack(pady=5)
-        
+
         self.automanage_button = ttk.Button(root, text="全自动托管", command=self.open_automanage)
         self.automanage_button.pack(pady=5)
-        
+
         self.text_area = ScrolledText(root, wrap=tk.WORD, width=100, height=20, font=('Helvetica', 12))
         self.text_area.pack(pady=10, padx=10)
-        
+
         self.create_file_if_not_exists('ids.txt', '示例玩家ID\n')
         self.create_file_if_not_exists('results.txt')
         self.create_file_if_not_exists('ip.txt')
-        
+
         self.refresh_announcement()
 
     def create_file_if_not_exists(self, filename, content=""):
@@ -120,9 +120,6 @@ class App:
                             failed_ids.add(player_id)
         except FileNotFoundError:
             self.log(f"文件 {filename} 未找到")
-
-        self.log(f"成功的ID列表: {successful_ids}")
-        self.log(f"失败的ID列表: {failed_ids}")
 
         return successful_ids, failed_ids
 
@@ -234,7 +231,6 @@ class App:
             
             current_task_number = idx + 1
             self.log(f"正在执行第 {current_task_number}/{total_ids} 个任务: 玩家ID {player_id}")
-            self.print_system_usage()  # 打印系统资源使用情况
 
             token = self.login(player_id, password)
             if not token:
@@ -282,6 +278,9 @@ class App:
 
             # 添加延迟，模拟人类操作
             time.sleep(random.randint(3, 6))
+
+        self.log(f"成功的ID总数: {len(successful_ids)}")
+        self.log(f"失败的ID总数: {len(failed_ids)}")
 
     def show_welcome_message(self):
         welcome_message = "欢迎使用XMG游戏团队工具。\n请在下面的输入框中输入玩家ID并点击'添加ID'按钮添加，然后点击'开始领取'按钮运行脚本。"
