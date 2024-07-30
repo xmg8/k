@@ -29,5 +29,5 @@ jobs:
       - name: Upload executable
         uses: actions/upload-artifact@v3
         with:
-          name: script-executable
+          name: XMG游戏团队kop领取工具
           path: dist/kop.exe
