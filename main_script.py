@@ -136,13 +136,9 @@ class App:
             try:
                 with requests.Session() as session:
                     response = session.post(url, json=payload, headers=headers, verify=False, timeout=10)
-                    self.log(f"玩家 {player_id} 登录响应: {response.status_code}")
                     if response.status_code == 200 and 'Authorization' in response.headers:
                         return response.headers['Authorization']
-                    else:
-                        self.log(f"登录失败，状态码: {response.status_code}, 响应: {response.text}")
             except (ConnectionError, Timeout, SSLError) as e:
-                self.log(f"登录请求失败，重试 {attempt + 1}/{max_retries} 次: {e}")
                 time.sleep(2)  # 等待一段时间后重试
         return None
 
@@ -157,10 +153,8 @@ class App:
             try:
                 with requests.Session() as session:
                     response = session.get(url, headers=headers, verify=False, timeout=10)
-                    self.log(f"每日签到详情获取 {player_id}: {response.status_code}")
                     return response.json() if response.status_code == 200 else None
             except (ConnectionError, Timeout, SSLError) as e:
-                self.log(f"获取每日签到详情失败，重试 {attempt + 1}/{max_retries} 次: {e}")
                 time.sleep(2)  # 等待一段时间后重试
         return None
 
@@ -176,10 +170,8 @@ class App:
             try:
                 with requests.Session() as session:
                     response = session.post(url, json=payload, headers=headers, verify=False, timeout=10)
-                    self.log(f"每日签到响应 玩家 {player_id}, 第 {checkin_day} 天: {response.status_code}, {response.text}")
                     return response.json() if response.status_code == 200 else None
             except (ConnectionError, Timeout, SSLError) as e:
-                self.log(f"每日签到失败，重试 {attempt + 1}/{max_retries} 次: {e}")
                 time.sleep(2)  # 等待一段时间后重试
         return None
 
