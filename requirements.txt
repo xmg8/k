@@ -1,4 +1,13 @@
-requests
-psutil
-pyinstaller
-tkhtmlview
+altgraph==0.17.4
+certifi==2023.7.22
+charset-normalizer==3.3.0
+Eel==0.14.0
+future==0.18.3
+idna==3.4
+pefile==2023.2.7
+Pillow==10.0.0
+pyinstaller==6.0.0
+pyinstaller-hooks-contrib==2024.7
+pywin32==306
+requests==2.31.0
+tkinterhtml
