@@ -10,9 +10,6 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 # 忽略SSL警告
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
-# 设置代理API URL
-proxy_api_url = 'https://get.ip.sgxz.cn/get/ip?pt=22&num=1&gt=0&isp=2&port=1&time=5&type=1&pack=3417&ts=0&lb=1&clb=&sp=0&csp=&distinct=2&aw=0&at=1&regions=610000,420000,430000,130000,510000,370000,440000'
-
 # 创建文件（如果不存在）
 def create_file_if_not_exists(filename, content=""):
     if not os.path.exists(filename):
@@ -24,33 +21,6 @@ def initialize_files():
     create_file_if_not_exists('ids.txt', '示例玩家ID\n')
     create_file_if_not_exists('results.txt')
     create_file_if_not_exists('ip.txt')
-
-# 获取代理IP
-def get_proxy():
-    try:
-        response = requests.get(proxy_api_url, timeout=10)
-        response.raise_for_status()
-        proxy_ip_port = response.text.strip()
-        ip, port = proxy_ip_port.split(":")
-        return {
-            'http': f"http://{ip}:{port}",
-            'https': f"https://{ip}:{port}"
-        }
-    except Exception as e:
-        print(f"获取代理IP失败: {e}")
-        return None
-
-# 检测代理IP是否可用
-def is_proxy_working(proxy):
-    test_url = 'https://httpbin.org/ip'
-    try:
-        response = requests.get(test_url, proxies=proxy, timeout=5, verify=False)
-        if response.status_code == 200:
-            print(f"使用代理IP {proxy['http']} 请求成功，返回IP: {response.json()['origin']}")
-            return True
-    except Exception as e:
-        print(f"代理不可用: {e}")
-    return False
 
 # 读取游戏ID和密码列表
 def read_ids_and_passwords(filename):
@@ -94,7 +64,7 @@ def read_results(filename):
     return successful_ids, failed_ids
 
 # 登录请求并获取token
-def login(player_id, password, proxies, max_retries=3):
+def login(player_id, password, max_retries=3):
     url = 'https://ls.store.koppay.net/api/v2/store/login/player'
     payload = {'player_id': player_id, 'site_id': 22}
     headers = {
@@ -106,7 +76,7 @@ def login(player_id, password, proxies, max_retries=3):
     for attempt in range(max_retries):
         try:
             with requests.Session() as session:
-                response = session.post(url, json=payload, headers=headers, proxies=proxies, verify=False, timeout=10)
+                response = session.post(url, json=payload, headers=headers, verify=False, timeout=10)
                 print(f"玩家 {player_id} 登录响应: {response.status_code}")
                 if response.status_code == 200 and 'Authorization' in response.headers:
                     return response.headers['Authorization']
@@ -114,16 +84,11 @@ def login(player_id, password, proxies, max_retries=3):
                     print(f"登录失败，状态码: {response.status_code}, 响应: {response.text}")
         except (ConnectionError, Timeout, SSLError) as e:
             print(f"登录请求失败，重试 {attempt + 1}/{max_retries} 次: {e}")
-            if isinstance(e, SSLError):
-                # 更换代理
-                proxies = get_proxy()
-                while proxies and not is_proxy_working(proxies):
-                    proxies = get_proxy()
             time.sleep(2)  # 等待一段时间后重试
     return None
 
 # 获取每日签到详情
-def get_checkin_details(token, player_id, proxies, max_retries=3):
+def get_checkin_details(token, player_id, max_retries=3):
     url = f'https://ls.store.koppay.net/api/v2/store/sale/biz/get/checkin/details?project_id=15&player_id={player_id}'
     headers = {
         'Authorization': token,
@@ -133,21 +98,16 @@ def get_checkin_details(token, player_id, proxies, max_retries=3):
     for attempt in range(max_retries):
         try:
             with requests.Session() as session:
-                response = session.get(url, headers=headers, proxies=proxies, verify=False, timeout=10)
+                response = session.get(url, headers=headers, verify=False, timeout=10)
                 print(f"每日签到详情获取 {player_id}: {response.status_code}")
                 return response.json() if response.status_code == 200 else None
         except (ConnectionError, Timeout, SSLError) as e:
             print(f"获取每日签到详情失败，重试 {attempt + 1}/{max_retries} 次: {e}")
-            if isinstance(e, SSLError):
-                # 更换代理
-                proxies = get_proxy()
-                while proxies and not is_proxy_working(proxies):
-                    proxies = get_proxy()
             time.sleep(2)  # 等待一段时间后重试
     return None
 
 # 执行每日签到
-def daily_checkin(token, player_id, checkin_day, proxies, max_retries=3):
+def daily_checkin(token, player_id, checkin_day, max_retries=3):
     url = 'https://ls.store.koppay.net/api/v2/store/sale/biz/add/checkin/create'
     headers = {
         'Authorization': token,
@@ -158,23 +118,13 @@ def daily_checkin(token, player_id, checkin_day, proxies, max_retries=3):
     for attempt in range(max_retries):
         try:
             with requests.Session() as session:
-                response = session.post(url, json=payload, headers=headers, proxies=proxies, verify=False, timeout=10)
+                response = session.post(url, json=payload, headers=headers, verify=False, timeout=10)
                 print(f"每日签到响应 玩家 {player_id}, 第 {checkin_day} 天: {response.status_code}, {response.text}")
                 return response.json() if response.status_code == 200 else None
         except (ConnectionError, Timeout, SSLError) as e:
             print(f"每日签到失败，重试 {attempt + 1}/{max_retries} 次: {e}")
-            if isinstance(e, SSLError):
-                # 更换代理
-                proxies = get_proxy()
-                while proxies and not is_proxy_working(proxies):
-                    proxies = get_proxy()
             time.sleep(2)  # 等待一段时间后重试
     return None
-
-# 记录失败的IP地址
-def log_failed_ip(ip):
-    with open('ip.txt', 'a') as file:
-        file.write(f"{datetime.now()} 失败的IP: {ip}\n")
 
 # 打印系统资源使用情况
 def print_system_usage():
@@ -202,25 +152,19 @@ def main():
     print(f"需要执行任务的ID总数: {len(ids_to_run)}")
     print(f"需要执行任务的ID列表: {ids_to_run}")
 
-    proxies = get_proxy()
-    while proxies and not is_proxy_working(proxies):
-        proxies = get_proxy()
-
     for idx, (player_id, password) in enumerate(ids_to_run):
         current_task_number = idx + 1
         print(f"正在执行第 {current_task_number}/{len(ids_to_run)} 个任务: 玩家ID {player_id}")
         print_system_usage()  # 打印系统资源使用情况
 
-        token = login(player_id, password, proxies)
+        token = login(player_id, password)
         if not token:
-            proxy_ip = proxies['http'].split('//')[1].split(':')[0]
-            log_failed_ip(proxy_ip)
             with open('results.txt', 'a') as file:
                 file.write(f"{datetime.now()} 玩家 {player_id} 登录失败\n")
             failed_ids.add(player_id)
             continue
 
-        checkin_details = get_checkin_details(token, player_id, proxies)
+        checkin_details = get_checkin_details(token, player_id)
         if not checkin_details:
             with open('results.txt', 'a') as file:
                 file.write(f"{datetime.now()} 玩家 {player_id} 获取每日签到详情失败\n")
@@ -234,7 +178,7 @@ def main():
                     no_task = False
                     checkin_day = int(day_info['name_language_code'].replace('第', '').replace('日', ''))
                     for attempt in range(1, 6):
-                        checkin_response = daily_checkin(token, player_id, checkin_day, proxies)
+                        checkin_response = daily_checkin(token, player_id, checkin_day)
                         if checkin_response and checkin_response['code'] == 1:
                             with open('results.txt', 'a') as file:
                                 file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到成功\n")
@@ -254,12 +198,6 @@ def main():
 
         # 添加延迟，模拟人类操作
         time.sleep(random.randint(3, 6))
-
-        # 每三个ID重新获取代理
-        if (current_task_number) % 3 == 0:
-            proxies = get_proxy()
-            while proxies and not is_proxy_working(proxies):
-                proxies = get_proxy()
 
 if __name__ == '__main__':
     main()
