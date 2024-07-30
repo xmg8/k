@@ -12,3 +12,4 @@ pywin32==306
 requests==2.31.0
 psutil
 tkhtmlview
+tkinterhtml
