@@ -1,139 +1,141 @@
-import tkinter as tk
-from tkinter import scrolledtext, messagebox
+from tkinter import *
+from tkinter import scrolledtext
 import requests
-import threading
-import webbrowser
-from datetime import datetime
-import os
-import random
-import time
 from bs4 import BeautifulSoup
+import time
+import threading
+import os
 
-# 创建文件（如果不存在）
-def create_file_if_not_exists(filename, content=""):
-    if not os.path.exists(filename):
-        with open(filename, 'w', encoding='utf-8') as file:
-            file.write(content)
-
-# 初始化所需文件
-def initialize_files():
-    create_file_if_not_exists('ids.txt', '')
-    create_file_if_not_exists('results.txt')
-    create_file_if_not_exists('ip.txt')
-
-class Application(tk.Tk):
+class Application(Tk):
     def __init__(self):
         super().__init__()
         self.title("XMG游戏团队")
-        self.geometry("700x600")
+        self.geometry("800x600")
 
-        # 公告
-        self.announcement_label = tk.Label(self, text="公告:", font=("Arial", 12))
-        self.announcement_label.grid(row=0, column=0, sticky="w")
+        self.create_widgets()
+        self.initialize_files()
 
-        self.announcement_text = scrolledtext.ScrolledText(self, width=80, height=10, wrap=tk.WORD)
-        self.announcement_text.grid(row=1, column=0, columnspan=5, padx=10, pady=5)
-        self.update_announcement()
+    def create_widgets(self):
+        # 公告标签和文本框
+        self.announcement_label = Label(self, text="公告:")
+        self.announcement_label.grid(row=0, column=0, sticky='w')
+        self.announcement_text = scrolledtext.ScrolledText(self, wrap=WORD, width=70, height=10)
+        self.announcement_text.grid(row=1, column=0, columnspan=4, sticky='nsew')
 
-        # 输入框和按钮
-        self.id_label = tk.Label(self, text="输入玩家ID:")
-        self.id_label.grid(row=2, column=0, pady=5)
+        # 刷新公告按钮
+        self.refresh_button = Button(self, text="刷新公告", command=self.refresh_announcement)
+        self.refresh_button.grid(row=0, column=1, sticky='e')
 
-        self.id_entry = tk.Entry(self)
-        self.id_entry.grid(row=2, column=1, pady=5)
+        # 玩家ID输入框和标签
+        self.player_id_label = Label(self, text="输入玩家ID:")
+        self.player_id_label.grid(row=2, column=0, sticky='w')
+        self.player_id_entry = Entry(self, width=30)
+        self.player_id_entry.grid(row=2, column=1, sticky='w')
 
-        self.add_button = tk.Button(self, text="添加ID", command=self.add_id)
-        self.add_button.grid(row=2, column=2, pady=5)
+        # 添加ID按钮
+        self.add_id_button = Button(self, text="添加ID", command=self.add_player_id)
+        self.add_id_button.grid(row=2, column=2, sticky='w')
 
-        self.start_button = tk.Button(self, text="开始领取", command=self.start_retrieve)
-        self.start_button.grid(row=2, column=3, pady=5)
+        # 按钮框架
+        self.button_frame = Frame(self)
+        self.button_frame.grid(row=3, column=0, columnspan=4, pady=10, sticky='ew')
 
-        self.stop_button = tk.Button(self, text="停止领取", command=self.stop_retrieve)
-        self.stop_button.grid(row=2, column=4, pady=5)
+        # 开始领取按钮
+        self.start_button = Button(self.button_frame, text="开始领取", command=self.start_retrieve)
+        self.start_button.pack(side=LEFT, padx=5)
 
-        self.auto_button = tk.Button(self, text="全自动托管", command=self.open_auto_manage)
-        self.auto_button.grid(row=3, column=2, pady=5)
+        # 停止领取按钮
+        self.stop_button = Button(self.button_frame, text="停止领取", command=self.stop_retrieve)
+        self.stop_button.pack(side=LEFT, padx=5)
 
-        # 日志框
-        self.log_text = scrolledtext.ScrolledText(self, width=80, height=15, wrap=tk.WORD)
-        self.log_text.grid(row=4, column=0, columnspan=5, padx=10, pady=5)
+        # 全自动托管按钮
+        self.auto_button = Button(self.button_frame, text="全自动托管", command=self.open_browser)
+        self.auto_button.pack(side=LEFT, padx=5)
 
-        self.running = False
+        # 日志文本框
+        self.log_text = scrolledtext.ScrolledText(self, wrap=WORD, width=100, height=10)
+        self.log_text.grid(row=4, column=0, columnspan=4, pady=10, sticky='nsew')
 
-        initialize_files()
+        # 界面布局调整
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=1)
+        self.grid_columnconfigure(3, weight=1)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(4, weight=1)
 
-    def update_announcement(self):
+    def initialize_files(self):
+        self.create_file_if_not_exists('ids.txt', '示例玩家ID\n')
+        self.create_file_if_not_exists('results.txt')
+
+    def create_file_if_not_exists(self, filename, content=""):
+        if not os.path.exists(filename):
+            with open(filename, 'w') as file:
+                file.write(content)
+
+    def refresh_announcement(self):
         try:
-            response = requests.get('https://xmg8.github.io/kop/', timeout=10)
+            response = requests.get('https://xmg8.github.io/kop/')
             response.raise_for_status()
-            soup = BeautifulSoup(response.text, 'html.parser')
-            announcement = soup.find('div', class_='announcement').prettify()
-            self.announcement_text.delete(1.0, tk.END)
-            self.announcement_text.insert(tk.END, announcement)
-        except Exception as e:
-            self.announcement_text.delete(1.0, tk.END)
-            self.announcement_text.insert(tk.END, f"获取公告失败: {e}")
+            soup = BeautifulSoup(response.content, 'html.parser')
+            announcement = soup.find("div", class_="announcement").decode_contents()
+            self.announcement_text.delete(1.0, END)
+            self.announcement_text.insert(END, announcement)
+        except requests.RequestException as e:
+            self.log(f"获取公告失败: {e}")
 
-    def add_id(self):
-        player_id = self.id_entry.get().strip()
+    def add_player_id(self):
+        player_id = self.player_id_entry.get().strip()
         if player_id:
-            with open('ids.txt', 'a', encoding='utf-8') as file:
+            with open('ids.txt', 'a') as file:
                 file.write(f"{player_id}\n")
+            self.player_id_entry.delete(0, END)
             self.log(f"添加玩家ID: {player_id}")
-            self.id_entry.delete(0, tk.END)
 
     def log(self, message):
-        self.log_text.insert(tk.END, f"{message}\n")
-        self.log_text.see(tk.END)
+        self.log_text.insert(END, message + '\n')
+        self.log_text.see(END)
 
-    def start_retrieve(self):
-        if not self.running:
-            self.running = True
-            self.log("开始领取任务")
-            threading.Thread(target=self.run_script).start()
-
-    def stop_retrieve(self):
-        self.running = False
-        self.log("停止领取任务")
-
-    def open_auto_manage(self):
+    def open_browser(self):
+        import webbrowser
         webbrowser.open('http://www.xmg888.top')
 
+    def start_retrieve(self):
+        self.log("开始领取任务")
+        self.retrieve_thread = threading.Thread(target=self.run_script)
+        self.retrieve_thread.start()
+
+    def stop_retrieve(self):
+        self.stop_retrieve_flag = True
+        self.log("停止领取任务")
+
     def run_script(self):
-        ids_and_passwords = self.read_ids_and_passwords('ids.txt')
-        unique_ids_and_passwords = list(set(ids_and_passwords))
-        successful_ids, failed_ids = self.read_results('results.txt')
+        self.stop_retrieve_flag = False
+        player_ids = self.read_ids('ids.txt')
+        successful_ids, failed_ids = set(), set()
 
-        # 过滤掉已经成功签到的ID
-        ids_to_run = [(id, pwd) for id, pwd in unique_ids_and_passwords if id not in successful_ids]
+        self.log(f"需要执行任务的ID总数: {len(player_ids)}")
 
-        self.log(f"读取到的ID总数: {len(unique_ids_and_passwords)}")
-        self.log(f"成功的ID总数: {len(successful_ids)}")
-        self.log(f"失败的ID总数: {len(failed_ids)}")
-        self.log(f"需要执行任务的ID总数: {len(ids_to_run)}")
-
-        for idx, (player_id, password) in enumerate(ids_to_run):
-            if not self.running:
+        for idx, player_id in enumerate(player_ids):
+            if self.stop_retrieve_flag:
+                self.log("领取任务被手动停止")
                 break
-            current_task_number = idx + 1
-            self.log(f"正在执行第 {current_task_number}/{len(ids_to_run)} 个任务: 玩家ID {player_id}")
 
-            token = self.login(player_id, password)
+            self.log(f"正在执行第 {idx + 1}/{len(player_ids)} 个任务: 玩家ID {player_id}")
+            token = self.login(player_id, None)
             if not token:
-                self.log(f"玩家 {player_id} 登录失败")
                 failed_ids.add(player_id)
                 continue
 
             checkin_details = self.get_checkin_details(token, player_id)
             if not checkin_details:
-                self.log(f"玩家 {player_id} 获取每日签到详情失败")
                 failed_ids.add(player_id)
                 continue
 
             no_task = True
             if checkin_details and checkin_details['code'] == 1:
                 for day_info in checkin_details['data']['activity_gifts_list']:
-                    if day_info['status'] == 1:  # 检查是否可以领取
+                    if day_info['status'] == 1:
                         no_task = False
                         checkin_day = int(day_info['name_language_code'].replace('第', '').replace('日', ''))
                         for attempt in range(1, 6):
@@ -143,56 +145,28 @@ class Application(tk.Tk):
                                 successful_ids.add(player_id)
                                 break
                             else:
-                                self.log(f"第{checkin_day}天签到失败，重试 {attempt}/5 次: {checkin_response}")
+                                self.log(f"第{checkin_day}天签到失败，重试 {attempt}/5 次")
                                 time.sleep(2)
                         else:
-                            self.log(f"玩家 {player_id} 第{checkin_day}天签到最终失败: {checkin_response}")
+                            self.log(f"玩家 {player_id} 第{checkin_day}天签到最终失败")
                             failed_ids.add(player_id)
-            if no_task:
-                self.log(f"玩家 {player_id} 没有可领取的每日签到任务或任务已完成")
-                successful_ids.add(player_id)
+                if no_task:
+                    self.log(f"玩家 {player_id} 没有可领取的每日签到任务或任务已完成")
+                    successful_ids.add(player_id)
 
-            # 添加延迟，模拟人类操作
-            time.sleep(random.randint(3, 6))
+            time.sleep(2)
 
         self.log(f"成功的ID总数: {len(successful_ids)}")
         self.log(f"失败的ID总数: {len(failed_ids)}")
-        self.log("停止领取任务")
 
-    def read_ids_and_passwords(self, filename):
-        ids_and_passwords = []
-        try:
-            with open(filename, 'r', encoding='utf-8') as file:
-                for line in file:
-                    parts = line.strip().split()
-                    if len(parts) == 1:
-                        ids_and_passwords.append((parts[0], None))  # 只有ID，没有密码
-                    elif len(parts) == 2 and parts[1].isdigit() and len(parts[1]) == 6:
-                        ids_and_passwords.append((parts[0], parts[1]))  # ID和6位数字密码
-        except FileNotFoundError:
-            self.log(f"文件 {filename} 未找到")
-        return ids_and_passwords
-
-    def read_results(self, filename):
-        successful_ids = set()
-        failed_ids = set()
-        current_date = datetime.now().strftime('%Y-%m-%d')
-        try:
-            with open(filename, 'r', encoding='utf-8') as file:
-                for line in file.readlines():
-                    parts = line.split()
-                    if len(parts) < 4:
-                        continue
-                    result_date = parts[0].split('T')[0]
-                    player_id = parts[3]  # 假设ID总是位于第四个位置
-                    if result_date == current_date:
-                        if "签到成功" in line or ("第" in line and "天签到成功" in line) or "没有可领取的每日签到任务或任务已完成" in line:
-                            successful_ids.add(player_id)
-                        else:
-                            failed_ids.add(player_id)
-        except FileNotFoundError:
-            self.log(f"文件 {filename} 未找到")
-        return successful_ids, failed_ids
+    def read_ids(self, filename):
+        ids = []
+        with open(filename, 'r') as file:
+            for line in file:
+                line = line.strip()
+                if line and line != '示例玩家ID':
+                    ids.append(line)
+        return ids
 
     def login(self, player_id, password):
         url = 'https://ls.store.koppay.net/api/v2/store/login/player'
@@ -227,9 +201,12 @@ class Application(tk.Tk):
             try:
                 with requests.Session() as session:
                     response = session.get(url, headers=headers, timeout=10)
-                    return response.json() if response.status_code == 200 else None
+                    if response.status_code == 200:
+                        return response.json()
+                    else:
+                        self.log(f"每日签到详情获取 {player_id} 失败，状态码: {response.status_code}")
             except requests.RequestException as e:
-                self.log(f"获取每日签到详情失败，重试 {attempt + 1}/3 次: {e}")
+                self.log(f"每日签到详情获取 {player_id} 失败，重试 {attempt + 1}/3 次: {e}")
                 time.sleep(2)
         return None
 
@@ -245,12 +222,15 @@ class Application(tk.Tk):
             try:
                 with requests.Session() as session:
                     response = session.post(url, json=payload, headers=headers, timeout=10)
-                    return response.json() if response.status_code == 200 else None
+                    if response.status_code == 200:
+                        return response.json()
+                    else:
+                        self.log(f"每日签到请求 玩家 {player_id} 第{checkin_day}天失败，状态码: {response.status_code}")
             except requests.RequestException as e:
-                self.log(f"每日签到失败，重试 {attempt + 1}/3 次: {e}")
+                self.log(f"每日签到请求 玩家 {player_id} 第{checkin_day}天失败，重试 {attempt + 1}/3 次: {e}")
                 time.sleep(2)
         return None
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app = Application()
     app.mainloop()
