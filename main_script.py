@@ -1,7 +1,9 @@
-import tkinter as tk
-from tkinter import scrolledtext, messagebox
 from tkinterhtml import HtmlFrame
 from threading import Thread
+import tkinter as tk
+from tkinter import scrolledtext
+from tkinter import messagebox
+from tkhtmlview import HTMLLabel
 import requests
 import psutil
 import webbrowser
@@ -11,50 +13,52 @@ import os
 from datetime import datetime
 from requests.exceptions import ConnectionError, Timeout, SSLError
 
-class App:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("XMG游戏团队")
-        self.root.geometry("800x600")
+class Application(tk.Tk):
+    def __init__(self):
+        super().__init__()
+        self.title("XMG游戏团队")
+        self.geometry("600x600")
 
-        self.create_widgets()
-        self.initialize_files()
+        self.announcement_html = HTMLLabel(self, html="", width=100, height=10)
+        self.announcement_html.pack()
 
-        self.running = False
-        self.script_thread = None
-
-        self.show_welcome_message()
-
-    def create_widgets(self):
-        self.announcement_label = tk.Label(self.root, text="公告:")
-        self.announcement_label.pack()
-
-        self.announcement_html = HtmlFrame(self.root, horizontal_scrollbar="auto")
-        self.announcement_html.pack(expand=True, fill="both")
-
-        self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement)
+        # 刷新公告按钮
+        self.refresh_button = tk.Button(self, text="刷新公告", command=self.refresh_announcement)
         self.refresh_button.pack()
 
-        self.input_label = tk.Label(self.root, text="输入玩家ID:")
-        self.input_label.pack()
-
-        self.id_entry = tk.Entry(self.root)
+        # 输入玩家ID
+        self.id_entry = tk.Entry(self)
         self.id_entry.pack()
 
-        self.add_button = tk.Button(self.root, text="添加ID", command=self.add_id)
-        self.add_button.pack()
+        # 添加ID按钮
+        self.add_id_button = tk.Button(self, text="添加ID", command=self.add_id)
+        self.add_id_button.pack()
 
-        self.start_button = tk.Button(self.root, text="开始领取", command=self.start_script)
+        # 开始领取按钮
+        self.start_button = tk.Button(self, text="开始领取", command=self.start_retrieve)
         self.start_button.pack()
 
-        self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_script)
+        # 停止领取按钮
+        self.stop_button = tk.Button(self, text="停止领取", command=self.stop_retrieve)
         self.stop_button.pack()
 
-        self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_automanage)
+        # 全自动托管按钮
+        self.auto_manage_button = tk.Button(self, text="全自动托管", command=self.auto_manage)
         self.auto_manage_button.pack()
 
-        self.log_text = scrolledtext.ScrolledText(self.root, wrap=tk.WORD, width=80, height=20)
-        self.log_text.pack()
+        # 日志输出
+        self.log_output = scrolledtext.ScrolledText(self, width=100, height=20)
+        self.log_output.pack()
+
+    def refresh_announcement(self):
+        url = 'https://xmg8.github.io/kop/announcement.html'
+        try:
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            announcement = response.text.strip()
+            self.announcement_html.set_html(announcement)
+        except Exception as e:
+            self.log(f"获取公告失败: {e}")
 
     def initialize_files(self):
         self.create_file_if_not_exists('ids.txt')
@@ -274,7 +278,7 @@ class App:
     def show_welcome_message(self):
         messagebox.showinfo("欢迎", "欢迎使用XMG游戏团队工具。请确保ID文件已更新，并点击开始领取任务。")
 
-if __name__ == '__main__':
-    root = tk.Tk()
-    app = App(root)
-    root.mainloop()
+if __name__ == "__main__":
+    app = Application()
+    app.mainloop()
+
