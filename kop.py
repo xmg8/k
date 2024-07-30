@@ -21,6 +21,7 @@ class App:
     def __init__(self, root):
         self.root = root
         self.root.title("XMG游戏团队")
+        self.root.geometry("800x600")  # 设置窗口大小
 
         self.create_widgets()
         self.initialize_files()
@@ -30,7 +31,7 @@ class App:
     def create_widgets(self):
         # 公告显示区
         self.announcement_frame = tk.Frame(self.root, width=600, height=200)
-        self.announcement_frame.grid(row=0, column=0, columnspan=4, padx=10, pady=10, sticky='nsew')
+        self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
         self.announcement_label = HTMLLabel(self.announcement_frame, html="<p>公告内容加载中...</p>")
         self.announcement_label.pack(fill='both', expand=True)
 
