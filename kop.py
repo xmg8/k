@@ -9,6 +9,10 @@ from datetime import datetime
 import psutil
 import os
 from bs4 import BeautifulSoup
+from requests.packages.urllib3.exceptions import InsecureRequestWarning
+
+# 忽略SSL警告
+requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # 设置公告URL
 announcement_url = 'https://xmg8.github.io/kop/'
@@ -86,7 +90,7 @@ class App:
 
     def refresh_announcement(self):
         try:
-            response = requests.get(announcement_url)
+            response = requests.get(announcement_url, verify=False)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
             announcement_content = str(soup)
@@ -206,7 +210,7 @@ class App:
                     result_date = parts[0].split('T')[0]
                     player_id = parts[3]  # 假设ID总是位于第四个位置
                     if result_date == current_date:
-                        if "签到成功" in line or ("第" in line and "天签到成功" in line) or "没有可领取的每日签到任务或任务已完成" in line or "重试没有可领取的每日签到任务或任务已完成" in line:
+                        if "签到成功" in line or ("第" in line and "天签到成功" in line) or "没有可领取的每日签到任务或任务已完成" in line:
                             successful_ids.add(player_id)
                         else:
                             failed_ids.add(player_id)
@@ -225,7 +229,7 @@ class App:
 
         try:
             with requests.Session() as session:
-                response = session.post(url, json=payload, headers=headers, timeout=10)
+                response = session.post(url, json=payload, headers=headers, timeout=10, verify=False)
                 if response.status_code == 200 and 'Authorization' in response.headers:
                     return response.headers['Authorization']
                 else:
@@ -243,7 +247,7 @@ class App:
 
         try:
             with requests.Session() as session:
-                response = session.get(url, headers=headers, timeout=10)
+                response = session.get(url, headers=headers, timeout=10, verify=False)
                 if response.status_code == 200:
                     return response.json()
         except requests.exceptions.RequestException as e:
@@ -260,7 +264,7 @@ class App:
 
         try:
             with requests.Session() as session:
-                response = session.post(url, json=payload, headers=headers, timeout=10)
+                response = session.post(url, json=payload, headers=headers, timeout=10, verify=False)
                 return response.json() if response.status_code == 200 else None
         except requests.exceptions.RequestException as e:
             self.log(f"每日签到请求失败: {e}")
