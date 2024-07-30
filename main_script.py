@@ -175,7 +175,7 @@ class Application(tk.Tk):
         self.stop_event = threading.Event()
 
     def refresh_announcement(self):
-        url = 'https://xmg8.github.io/kop/announcement.html'
+        url = 'https://xmg8.github.io/kop'
         try:
             response = requests.get(url, timeout=10)
             response.raise_for_status()
