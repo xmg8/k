@@ -80,7 +80,7 @@ class App:
     def add_id(self):
         player_id = self.id_entry.get()
         if player_id:
-            with open('ids.txt', 'a') as file:
+            with open('ids.txt', 'a', encoding='utf-8') as file:
                 file.write(player_id + '\n')
             self.log(f"添加玩家ID: {player_id}")
             self.id_entry.delete(0, tk.END)
@@ -90,7 +90,7 @@ class App:
     def read_ids_and_passwords(self, filename):
         ids_and_passwords = []
         try:
-            with open(filename, 'r') as file:
+            with open(filename, 'r', encoding='utf-8') as file:
                 for line in file:
                     parts = line.strip().split()
                     if len(parts) == 1:
@@ -106,7 +106,7 @@ class App:
         failed_ids = set()
         current_date = datetime.now().strftime('%Y-%m-%d')
         try:
-            with open(filename, 'r') as file:
+            with open(filename, 'r', encoding='utf-8') as file:
                 for line in file.readlines():
                     parts = line.split()
                     if len(parts) < 4:
