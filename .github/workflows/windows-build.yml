@@ -31,5 +31,5 @@ jobs:
     - name: Upload executable
       uses: actions/upload-artifact@v3
       with:
-        name: script-executable
+        name: xmg
         path: dist/main_script.exe
