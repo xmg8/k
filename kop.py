@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import time
 import threading
 import os
+from tkinterhtml import HtmlFrame
 
 class Application(Tk):
     def __init__(self):
@@ -16,11 +17,11 @@ class Application(Tk):
         self.initialize_files()
 
     def create_widgets(self):
-        # 公告标签和文本框
+        # 公告标签和HTML框架
         self.announcement_label = Label(self, text="公告:")
         self.announcement_label.grid(row=0, column=0, sticky='w')
-        self.announcement_text = scrolledtext.ScrolledText(self, wrap=WORD, width=70, height=10)
-        self.announcement_text.grid(row=1, column=0, columnspan=4, sticky='nsew')
+        self.announcement_frame = HtmlFrame(self, horizontal_scrollbar="auto")
+        self.announcement_frame.grid(row=1, column=0, columnspan=4, sticky='nsew')
 
         # 刷新公告按钮
         self.refresh_button = Button(self, text="刷新公告", command=self.refresh_announcement)
@@ -79,8 +80,7 @@ class Application(Tk):
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
             announcement = soup.find("div", class_="announcement").decode_contents()
-            self.announcement_text.delete(1.0, END)
-            self.announcement_text.insert(END, announcement)
+            self.announcement_frame.set_content(announcement)
         except requests.RequestException as e:
             self.log(f"获取公告失败: {e}")
 
@@ -204,9 +204,9 @@ class Application(Tk):
                     if response.status_code == 200:
                         return response.json()
                     else:
-                        self.log(f"每日签到详情获取 {player_id} 失败，状态码: {response.status_code}")
+                        self.log(f"每日签到详情获取失败 玩家 {player_id}，状态码: {response.status_code}")
             except requests.RequestException as e:
-                self.log(f"每日签到详情获取 {player_id} 失败，重试 {attempt + 1}/3 次: {e}")
+                self.log(f"每日签到详情获取失败 玩家 {player_id}，重试 {attempt + 1}/3 次: {e}")
                 time.sleep(2)
         return None
 
