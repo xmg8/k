@@ -4,9 +4,7 @@ import requests
 import threading
 import webbrowser
 from datetime import datetime
-import random
-import time
-import psutil
+import os
 
 class Application(tk.Tk):
     def __init__(self):
@@ -18,7 +16,7 @@ class Application(tk.Tk):
         self.announcement_label = tk.Label(self, text="公告:", font=("Arial", 12))
         self.announcement_label.grid(row=0, column=0, sticky="w")
 
-        self.announcement_text = scrolledtext.ScrolledText(self, width=70, height=5, wrap=tk.WORD)
+        self.announcement_text = scrolledtext.ScrolledText(self, width=70, height=10, wrap=tk.WORD)
         self.announcement_text.grid(row=1, column=0, columnspan=5, padx=10, pady=5)
         self.update_announcement()
 
@@ -42,15 +40,16 @@ class Application(tk.Tk):
         self.auto_button.grid(row=3, column=2, columnspan=2, pady=5)
 
         # 日志文本框
-        self.log_text = scrolledtext.ScrolledText(self, width=70, height=15, wrap=tk.WORD)
+        self.log_text = scrolledtext.ScrolledText(self, width=70, height=10, wrap=tk.WORD)
         self.log_text.grid(row=4, column=0, columnspan=5, padx=10, pady=5)
 
         self.retrieve_flag = False
         self.ids = []
+        self.initialize_files()
 
     def update_announcement(self):
         try:
-            response = requests.get("https://xmg8.github.io/kop/announcement.html")
+            response = requests.get("https://xmg8.github.io/kop/")
             response.raise_for_status()
             self.announcement_text.delete("1.0", tk.END)
             self.announcement_text.insert(tk.END, response.text)
@@ -63,6 +62,7 @@ class Application(tk.Tk):
         if player_id:
             self.ids.append(player_id)
             self.log_text.insert(tk.END, f"添加玩家ID: {player_id}\n")
+            self.log_text.yview(tk.END)
             self.id_entry.delete(0, tk.END)
         else:
             messagebox.showwarning("输入错误", "请输入有效的玩家ID")
@@ -72,11 +72,13 @@ class Application(tk.Tk):
             messagebox.showwarning("输入错误", "请添加至少一个玩家ID")
             return
         self.log_text.insert(tk.END, "开始领取任务\n")
+        self.log_text.yview(tk.END)
         self.retrieve_flag = True
         self.run_script()
 
     def stop_retrieve(self):
         self.log_text.insert(tk.END, "停止领取任务\n")
+        self.log_text.yview(tk.END)
         self.retrieve_flag = False
 
     def run_script(self):
@@ -88,22 +90,28 @@ class Application(tk.Tk):
                 if not self.retrieve_flag:
                     break
                 self.log_text.insert(tk.END, f"正在执行第 {idx + 1}/{total_ids} 个任务: 玩家ID {player_id}\n")
+                self.log_text.yview(tk.END)
                 # 登录并获取token
                 token = self.login(player_id)
                 if not token:
                     failed_ids.add(player_id)
                     self.log_text.insert(tk.END, f"玩家ID {player_id} 登录失败，停止执行该ID任务\n")
+                    self.log_text.yview(tk.END)
                     continue
                 
                 checkin_details = self.get_checkin_details(token, player_id)
                 if checkin_details:
                     self.log_text.insert(tk.END, f"玩家 {player_id} 没有可领取的每日签到任务或任务已完成\n")
+                    self.log_text.yview(tk.END)
                     successful_ids.add(player_id)
                 else:
                     failed_ids.add(player_id)
 
                 self.log_text.insert(tk.END, f"成功的ID总数: {len(successful_ids)}\n")
                 self.log_text.insert(tk.END, f"失败的ID总数: {len(failed_ids)}\n")
+                self.log_text.yview(tk.END)
+
+            self.write_results(successful_ids, failed_ids)
 
         threading.Thread(target=task).start()
 
@@ -119,6 +127,7 @@ class Application(tk.Tk):
                 return response.headers['Authorization']
         except requests.RequestException as e:
             self.log_text.insert(tk.END, f"玩家ID {player_id} 登录失败: {e}\n")
+            self.log_text.yview(tk.END)
         return None
 
     def get_checkin_details(self, token, player_id):
@@ -133,10 +142,24 @@ class Application(tk.Tk):
                 return response.json()
         except requests.RequestException as e:
             self.log_text.insert(tk.END, f"玩家ID {player_id} 获取每日签到详情失败: {e}\n")
+            self.log_text.yview(tk.END)
         return None
 
     def open_browser(self):
         webbrowser.open("http://www.xmg888.top")
+
+    def initialize_files(self):
+        if not os.path.exists('ids.txt'):
+            with open('ids.txt', 'w') as file:
+                file.write('')
+        if not os.path.exists('results.txt'):
+            with open('results.txt', 'w') as file:
+                file.write('')
+
+    def write_results(self, successful_ids, failed_ids):
+        with open('results.txt', 'a') as file:
+            file.write(f"{datetime.now()} 成功的ID: {successful_ids}\n")
+            file.write(f"{datetime.now()} 失败的ID: {failed_ids}\n")
 
 if __name__ == '__main__':
     app = Application()
