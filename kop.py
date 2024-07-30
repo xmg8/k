@@ -94,7 +94,7 @@ class App:
             response = requests.get(announcement_url, verify=False)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
-            announcement_content = str(soup)
+            announcement_content = soup.find("div", class_="announcement").prettify()
             self.announcement_label.set_html(announcement_content)
         except Exception as e:
             self.log(f"获取公告失败: {e}")
@@ -137,44 +137,50 @@ class App:
                 break
             self.log(f"正在执行第 {idx + 1}/{len(ids_to_run)} 个任务: 玩家ID {player_id}")
 
+            result_message = ""
             token = self.login(player_id, password)
             if not token:
+                result_message = "领取失败"
                 with open(self.results_file, 'a') as file:
                     file.write(f"{datetime.now()} 玩家 {player_id} 登录失败\n")
                 failed_ids.add(player_id)
-                continue
+            else:
+                checkin_details = self.get_checkin_details(token, player_id)
+                if not checkin_details:
+                    result_message = "领取失败"
+                    with open(self.results_file, 'a') as file:
+                        file.write(f"{datetime.now()} 玩家 {player_id} 获取每日签到详情失败\n")
+                    failed_ids.add(player_id)
+                else:
+                    no_task = True
+                    if checkin_details and checkin_details['code'] == 1:
+                        for day_info in checkin_details['data']['activity_gifts_list']:
+                            if day_info['status'] == 1:  # 检查是否可以领取
+                                no_task = False
+                                checkin_day = int(day_info['name_language_code'].replace('第', '').replace('日', ''))
+                                for attempt in range(1, 6):
+                                    checkin_response = self.daily_checkin(token, player_id, checkin_day)
+                                    if checkin_response and checkin_response['code'] == 1:
+                                        result_message = "领取成功"
+                                        with open(self.results_file, 'a') as file:
+                                            file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到成功\n")
+                                        successful_ids.add(player_id)
+                                        break
+                                    else:
+                                        self.log(f"第{checkin_day}天签到失败，重试 {attempt}/5 次: {checkin_response}")
+                                        time.sleep(2)
+                                else:
+                                    result_message = "领取失败"
+                                    with open(self.results_file, 'a') as file:
+                                        file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到最终失败: {checkin_response}\n")
+                                    failed_ids.add(player_id)
+                    if no_task:
+                        result_message = "领取成功"
+                        with open(self.results_file, 'a') as file:
+                            file.write(f"{datetime.now()} 玩家 {player_id} 没有可领取的每日签到任务或任务已完成\n")
+                        successful_ids.add(player_id)
 
-            checkin_details = self.get_checkin_details(token, player_id)
-            if not checkin_details:
-                with open(self.results_file, 'a') as file:
-                    file.write(f"{datetime.now()} 玩家 {player_id} 获取每日签到详情失败\n")
-                failed_ids.add(player_id)
-                continue
-
-            no_task = True
-            if checkin_details and checkin_details['code'] == 1:
-                for day_info in checkin_details['data']['activity_gifts_list']:
-                    if day_info['status'] == 1:  # 检查是否可以领取
-                        no_task = False
-                        checkin_day = int(day_info['name_language_code'].replace('第', '').replace('日', ''))
-                        for attempt in range(1, 6):
-                            checkin_response = self.daily_checkin(token, player_id, checkin_day)
-                            if checkin_response and checkin_response['code'] == 1:
-                                with open(self.results_file, 'a') as file:
-                                    file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到成功\n")
-                                successful_ids.add(player_id)
-                                break
-                            else:
-                                self.log(f"第{checkin_day}天签到失败，重试 {attempt}/5 次: {checkin_response}")
-                                time.sleep(2)
-                        else:
-                            with open(self.results_file, 'a') as file:
-                                file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到最终失败: {checkin_response}\n")
-                            failed_ids.add(player_id)
-            if no_task:
-                with open(self.results_file, 'a') as file:
-                    file.write(f"{datetime.now()} 玩家 {player_id} 没有可领取的每日签到任务或任务已完成\n")
-                successful_ids.add(player_id)
+            self.log(f"玩家ID {player_id} {result_message}")
 
             # 添加延迟，模拟人类操作
             time.sleep(random.randint(3, 6))
