@@ -13,3 +13,6 @@ requests==2.31.0
 psutil
 tkhtmlview
 tkinterhtml
+beautifulsoup4
+requests
+pyinstaller
