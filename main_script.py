@@ -20,6 +20,15 @@ class App:
         self.text_area = ScrolledText(root, wrap=tk.WORD, width=100, height=30)
         self.text_area.pack(pady=10, padx=10)
         
+        self.id_entry_label = tk.Label(root, text="Enter Player ID:")
+        self.id_entry_label.pack()
+        
+        self.id_entry = tk.Entry(root, width=50)
+        self.id_entry.pack(pady=5)
+        
+        self.add_id_button = tk.Button(root, text="Add ID", command=self.add_id)
+        self.add_id_button.pack(pady=5)
+        
         self.run_button = tk.Button(root, text="Run Script", command=self.run_script)
         self.run_button.pack(pady=5)
         
@@ -36,6 +45,16 @@ class App:
         self.text_area.insert(tk.END, message + '\n')
         self.text_area.see(tk.END)
         self.root.update()
+
+    def add_id(self):
+        player_id = self.id_entry.get()
+        if player_id:
+            with open('ids.txt', 'a') as file:
+                file.write(player_id + '\n')
+            self.log(f"Added Player ID: {player_id}")
+            self.id_entry.delete(0, tk.END)
+        else:
+            self.log("No Player ID entered")
 
     def read_ids_and_passwords(self, filename):
         ids_and_passwords = []
