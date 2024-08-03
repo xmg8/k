@@ -25,6 +25,7 @@ class App:
 
         self.create_widgets()
         self.initialize_files()
+        self.refresh_announcement()  # 自动加载公告内容
 
         self.is_running = False
 
@@ -32,8 +33,8 @@ class App:
         # 公告显示区
         self.announcement_frame = tk.Frame(self.root, width=600, height=200)
         self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
-        self.announcement_text = scrolledtext.ScrolledText(self.announcement_frame, wrap="word", bg="#ffffff", fg="#000000", font=("Tahoma", 12))
-        self.announcement_text.pack(fill='both', expand=True)
+        self.announcement_label = HTMLLabel(self.announcement_frame, html="<p>公告内容加载中...</p>")
+        self.announcement_label.pack(fill='both', expand=True)
 
         # 刷新公告按钮
         self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement)
@@ -60,7 +61,7 @@ class App:
         self.auto_manage_button.grid(row=1, column=5, padx=5, pady=5)
 
         # 日志显示区
-        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20, bg="#ffffff", fg="#000000", font=("Tahoma", 10))
+        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20)
         self.log_text.grid(row=2, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
 
         # 设置列和行的权重
@@ -94,9 +95,8 @@ class App:
             response = requests.get(announcement_url, verify=False)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
-            announcement_content = soup.find("div", class_="announcement").get_text()
-            self.announcement_text.delete("1.0", tk.END)
-            self.announcement_text.insert(tk.END, announcement_content)
+            announcement_content = soup.find("div", class_="announcement").prettify()
+            self.announcement_label.set_html(announcement_content)
         except Exception as e:
             self.log(f"获取公告失败: {e}")
 
