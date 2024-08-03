@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
+from tkhtmlview import HTMLLabel
 import requests
 import threading
 import random
@@ -14,7 +15,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # 设置公告URL
-announcement_url = 'https://xmg8.github.io/kop/'
+announcement_url = 'http://152.136.171.223/'
 
 class App:
     def __init__(self, root):
@@ -31,7 +32,7 @@ class App:
         # 公告显示区
         self.announcement_frame = tk.Frame(self.root, width=600, height=200)
         self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
-        self.announcement_text = tk.Text(self.announcement_frame, wrap="word", bg="#f0f0f0", fg="#000000", font=("Tahoma", 12))
+        self.announcement_text = scrolledtext.ScrolledText(self.announcement_frame, wrap="word", bg="#ffffff", fg="#000000", font=("Tahoma", 12))
         self.announcement_text.pack(fill='both', expand=True)
 
         # 刷新公告按钮
