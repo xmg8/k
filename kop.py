@@ -1,6 +1,5 @@
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
-from tkinterweb import HtmlFrame
 import requests
 import threading
 import random
@@ -27,14 +26,13 @@ class App:
         self.initialize_files()
 
         self.is_running = False
-        self.log_line_tag = 0  # 用于日志行的颜色交替
 
     def create_widgets(self):
         # 公告显示区
-        self.announcement_frame = tk.Frame(self.root, width=600, height=200, borderwidth=2, relief="groove")
+        self.announcement_frame = tk.Frame(self.root, width=600, height=200)
         self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
-        self.announcement_label = HtmlFrame(self.announcement_frame, horizontal_scrollbar="auto")
-        self.announcement_label.pack(fill='both', expand=True)
+        self.announcement_text = tk.Text(self.announcement_frame, wrap="word", bg="#f0f0f0", fg="#000000", font=("Tahoma", 12))
+        self.announcement_text.pack(fill='both', expand=True)
 
         # 刷新公告按钮
         self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement)
@@ -61,7 +59,7 @@ class App:
         self.auto_manage_button.grid(row=1, column=5, padx=5, pady=5)
 
         # 日志显示区
-        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20, borderwidth=2, relief="groove")
+        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20, bg="#ffffff", fg="#000000", font=("Tahoma", 10))
         self.log_text.grid(row=2, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
 
         # 设置列和行的权重
@@ -95,8 +93,9 @@ class App:
             response = requests.get(announcement_url, verify=False)
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
-            announcement_content = soup.find("div", class_="announcement").prettify()
-            self.announcement_label.set_content(announcement_content)
+            announcement_content = soup.find("div", class_="announcement").get_text()
+            self.announcement_text.delete("1.0", tk.END)
+            self.announcement_text.insert(tk.END, announcement_content)
         except Exception as e:
             self.log(f"获取公告失败: {e}")
 
@@ -117,11 +116,8 @@ class App:
         webbrowser.open('https://www.xmg888.top')
 
     def log(self, message):
-        tag = f"tag{self.log_line_tag}"
-        self.log_text.insert(tk.END, f"{message}\n", tag)
-        self.log_text.tag_configure(tag, background=["white", "lightgrey"][self.log_line_tag % 2])
+        self.log_text.insert(tk.END, f"{message}\n")
         self.log_text.see(tk.END)
-        self.log_line_tag += 1
 
     def run_script(self):
         ids_and_passwords = self.read_ids_and_passwords(self.ids_file)
