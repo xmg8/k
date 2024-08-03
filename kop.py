@@ -30,13 +30,13 @@ class App:
 
     def create_widgets(self):
         # 公告显示区
-        self.announcement_frame = tk.Frame(self.root, width=600, height=200, bg='#f0f0f0', bd=2, relief="solid")
+        self.announcement_frame = tk.Frame(self.root, width=600, height=200, bd=2, relief="groove")
         self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
-        self.announcement_label = HTMLLabel(self.announcement_frame, html="<p>公告内容加载中...</p>", background='#f0f0f0')
+        self.announcement_label = HTMLLabel(self.announcement_frame, html="<p>公告内容加载中...</p>")
         self.announcement_label.pack(fill='both', expand=True)
 
         # 刷新公告按钮
-        self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement, bg='#4CAF50', fg='white')
+        self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement, bg="#32CD32", fg="white")
         self.refresh_button.grid(row=1, column=0, padx=5, pady=5)
 
         # 玩家ID输入框
@@ -44,23 +44,23 @@ class App:
         self.id_entry.grid(row=1, column=1, padx=5, pady=5)
 
         # 添加ID按钮
-        self.add_id_button = tk.Button(self.root, text="添加ID", command=self.add_id, bg='#2196F3', fg='white')
+        self.add_id_button = tk.Button(self.root, text="添加ID", command=self.add_id, bg="#1E90FF", fg="white")
         self.add_id_button.grid(row=1, column=2, padx=5, pady=5)
 
         # 开始领取按钮
-        self.start_button = tk.Button(self.root, text="开始领取", command=self.start_retrieve, bg='#FF9800', fg='white')
+        self.start_button = tk.Button(self.root, text="开始领取", command=self.start_retrieve, bg="#FFA500", fg="white")
         self.start_button.grid(row=1, column=3, padx=5, pady=5)
 
         # 停止领取按钮
-        self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_retrieve, bg='#f44336', fg='white')
+        self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_retrieve, bg="#FF4500", fg="white")
         self.stop_button.grid(row=1, column=4, padx=5, pady=5)
 
         # 全自动托管按钮
-        self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_auto_manage, bg='#9C27B0', fg='white')
+        self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_auto_manage, bg="#8A2BE2", fg="white")
         self.auto_manage_button.grid(row=1, column=5, padx=5, pady=5)
 
         # 日志显示区
-        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20, bg='#ffffff')
+        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20)
         self.log_text.grid(row=2, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
 
         # 设置列和行的权重
@@ -109,15 +109,16 @@ class App:
     def stop_retrieve(self):
         if self.is_running:
             self.is_running = False
-            self.log("停止领取任务", "warning")
+            self.log("停止领取任务", "info")
 
     def open_auto_manage(self):
         import webbrowser
         webbrowser.open('https://www.xmg888.top')
 
     def log(self, message, msg_type="info"):
-        color = {"info": "black", "error": "red", "warning": "orange"}
-        self.log_text.insert(tk.END, f"{message}\n", color[msg_type])
+        colors = {"info": "black", "warning": "orange", "error": "red"}
+        self.log_text.insert(tk.END, f"{message}\n", msg_type)
+        self.log_text.tag_configure(msg_type, foreground=colors.get(msg_type, "black"))
         self.log_text.see(tk.END)
 
     def run_script(self):
@@ -181,7 +182,7 @@ class App:
                             file.write(f"{datetime.now()} 玩家 {player_id} 没有可领取的每日签到任务或任务已完成\n")
                         successful_ids.add(player_id)
 
-            self.log(f"玩家ID {player_id} {result_message}", "info" if result_message == "领取成功" else "error")
+            self.log(f"玩家ID {player_id} {result_message}", "info")
 
             # 添加延迟，模拟人类操作
             time.sleep(random.randint(3, 6))
