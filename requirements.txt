@@ -16,3 +16,4 @@ tkinterhtml
 beautifulsoup4
 requests
 pyinstaller
+tkinterweb
