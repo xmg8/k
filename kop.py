@@ -15,7 +15,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # 设置公告URL
-announcement_url = 'http://152.136.171.223/'
+announcement_url = 'https://xmg8.github.io/kop/'
 
 class App:
     def __init__(self, root):
@@ -25,43 +25,42 @@ class App:
 
         self.create_widgets()
         self.initialize_files()
-        self.refresh_announcement()  # 自动加载公告内容
 
         self.is_running = False
 
     def create_widgets(self):
         # 公告显示区
-        self.announcement_frame = tk.Frame(self.root, width=600, height=200)
+        self.announcement_frame = tk.Frame(self.root, width=600, height=200, bg='#f0f0f0', bd=2, relief="solid")
         self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
         self.announcement_label = HTMLLabel(self.announcement_frame, html="<p>公告内容加载中...</p>")
         self.announcement_label.pack(fill='both', expand=True)
 
         # 刷新公告按钮
-        self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement)
+        self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement, bg='#4CAF50', fg='white')
         self.refresh_button.grid(row=1, column=0, padx=5, pady=5)
 
         # 玩家ID输入框
-        self.id_entry = tk.Entry(self.root)
+        self.id_entry = tk.Entry(self.root, bg='#f0f0f0')
         self.id_entry.grid(row=1, column=1, padx=5, pady=5)
 
         # 添加ID按钮
-        self.add_id_button = tk.Button(self.root, text="添加ID", command=self.add_id)
+        self.add_id_button = tk.Button(self.root, text="添加ID", command=self.add_id, bg='#2196F3', fg='white')
         self.add_id_button.grid(row=1, column=2, padx=5, pady=5)
 
         # 开始领取按钮
-        self.start_button = tk.Button(self.root, text="开始领取", command=self.start_retrieve)
+        self.start_button = tk.Button(self.root, text="开始领取", command=self.start_retrieve, bg='#FF5722', fg='white')
         self.start_button.grid(row=1, column=3, padx=5, pady=5)
 
         # 停止领取按钮
-        self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_retrieve)
+        self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_retrieve, bg='#f44336', fg='white')
         self.stop_button.grid(row=1, column=4, padx=5, pady=5)
 
         # 全自动托管按钮
-        self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_auto_manage)
+        self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_auto_manage, bg='#9C27B0', fg='white')
         self.auto_manage_button.grid(row=1, column=5, padx=5, pady=5)
 
         # 日志显示区
-        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20)
+        self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20, bg='#f0f0f0')
         self.log_text.grid(row=2, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
 
         # 设置列和行的权重
