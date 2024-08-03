@@ -15,7 +15,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # 设置公告URL
-announcement_url = 'https://xmg8.github.io/kop/'
+announcement_url = 'http://152.136.171.223/'
 
 class App:
     def __init__(self, root):
