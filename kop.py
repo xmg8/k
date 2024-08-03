@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import scrolledtext, messagebox
-from tkhtmlview import HTMLLabel
+from tkinterweb import HtmlFrame
 import requests
 import threading
 import random
@@ -15,7 +15,7 @@ from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # 设置公告URL
-announcement_url = 'http://152.136.171.223/'
+announcement_url = 'https://xmg8.github.io/kop/'
 
 class App:
     def __init__(self, root):
@@ -32,7 +32,7 @@ class App:
         # 公告显示区
         self.announcement_frame = tk.Frame(self.root, width=600, height=200)
         self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
-        self.announcement_label = HTMLLabel(self.announcement_frame, html="<p>公告内容加载中...</p>")
+        self.announcement_label = HtmlFrame(self.announcement_frame, horizontal_scrollbar="auto")
         self.announcement_label.pack(fill='both', expand=True)
 
         # 刷新公告按钮
@@ -95,7 +95,7 @@ class App:
             response.raise_for_status()
             soup = BeautifulSoup(response.content, 'html.parser')
             announcement_content = soup.find("div", class_="announcement").prettify()
-            self.announcement_label.set_html(announcement_content)
+            self.announcement_label.set_content(announcement_content)
         except Exception as e:
             self.log(f"获取公告失败: {e}")
 
