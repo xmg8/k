@@ -6,6 +6,7 @@ import threading
 import random
 import time
 from datetime import datetime
+import psutil
 import os
 from bs4 import BeautifulSoup
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -29,13 +30,13 @@ class App:
 
     def create_widgets(self):
         # 公告显示区
-        self.announcement_frame = tk.Frame(self.root, width=600, height=200, bd=2, relief="groove")
+        self.announcement_frame = tk.Frame(self.root, width=600, height=200)
         self.announcement_frame.grid(row=0, column=0, columnspan=6, padx=10, pady=10, sticky='nsew')
         self.announcement_label = HTMLLabel(self.announcement_frame, html="<p>公告内容加载中...</p>")
         self.announcement_label.pack(fill='both', expand=True)
 
         # 刷新公告按钮
-        self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement, bg="#32CD32", fg="white")
+        self.refresh_button = tk.Button(self.root, text="刷新公告", command=self.refresh_announcement, bg='#90EE90')
         self.refresh_button.grid(row=1, column=0, padx=5, pady=5)
 
         # 玩家ID输入框
@@ -43,19 +44,19 @@ class App:
         self.id_entry.grid(row=1, column=1, padx=5, pady=5)
 
         # 添加ID按钮
-        self.add_id_button = tk.Button(self.root, text="添加ID", command=self.add_id, bg="#1E90FF", fg="white")
+        self.add_id_button = tk.Button(self.root, text="添加ID", command=self.add_id, bg='#ADD8E6')
         self.add_id_button.grid(row=1, column=2, padx=5, pady=5)
 
         # 开始领取按钮
-        self.start_button = tk.Button(self.root, text="开始领取", command=self.start_retrieve, bg="#FFA500", fg="white")
+        self.start_button = tk.Button(self.root, text="开始领取", command=self.start_retrieve, bg='#FFA500')
         self.start_button.grid(row=1, column=3, padx=5, pady=5)
 
         # 停止领取按钮
-        self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_retrieve, bg="#FF4500", fg="white")
+        self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_retrieve, bg='#FF6347')
         self.stop_button.grid(row=1, column=4, padx=5, pady=5)
 
         # 全自动托管按钮
-        self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_auto_manage, bg="#8A2BE2", fg="white")
+        self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_auto_manage, bg='#9370DB')
         self.auto_manage_button.grid(row=1, column=5, padx=5, pady=5)
 
         # 日志显示区
@@ -83,7 +84,7 @@ class App:
         if player_id:
             with open(self.ids_file, 'a') as file:
                 file.write(player_id + '\n')
-            self.log(f"玩家ID {player_id} 已添加", "info")
+            self.log(f"玩家ID {player_id} 已添加")
             self.id_entry.delete(0, tk.END)
         else:
             messagebox.showwarning("输入错误", "请输入有效的玩家ID")
@@ -101,23 +102,22 @@ class App:
     def start_retrieve(self):
         if not self.is_running:
             self.is_running = True
-            self.log("开始领取任务", "info")
+            self.log("开始领取任务")
             self.retrieve_thread = threading.Thread(target=self.run_script)
             self.retrieve_thread.start()
 
     def stop_retrieve(self):
         if self.is_running:
             self.is_running = False
-            self.log("停止领取任务", "info")
+            self.log("停止领取任务")
 
     def open_auto_manage(self):
         import webbrowser
         webbrowser.open('https://www.xmg888.top')
 
-    def log(self, message, msg_type="info"):
-        colors = {"info": "black", "warning": "orange", "error": "red"}
-        self.log_text.insert(tk.END, f"{message}\n", msg_type)
-        self.log_text.tag_configure(msg_type, foreground=colors.get(msg_type, "black"))
+    def log(self, message, level="info"):
+        tag = level if level in ("info", "error") else "info"
+        self.log_text.insert(tk.END, f"{message}\n", tag)
         self.log_text.see(tk.END)
 
     def run_script(self):
@@ -128,25 +128,29 @@ class App:
         # 过滤掉已经成功签到的ID
         ids_to_run = [(id, pwd) for id, pwd in unique_ids_and_passwords if id not in successful_ids]
 
-        self.log(f"读取到的ID总数: {len(unique_ids_and_passwords)}", "info")
-        self.log(f"成功的ID总数: {len(successful_ids)}", "info")
-        self.log(f"失败的ID总数: {len(failed_ids)}", "info")
-        self.log(f"需要执行任务的ID总数: {len(ids_to_run)}", "info")
+        self.log(f"读取到的ID总数: {len(unique_ids_and_passwords)}")
+        self.log(f"成功的ID总数: {len(successful_ids)}")
+        self.log(f"失败的ID总数: {len(failed_ids)}")
+        self.log(f"需要执行任务的ID总数: {len(ids_to_run)}")
 
         for idx, (player_id, password) in enumerate(ids_to_run):
             if not self.is_running:
                 break
-            self.log(f"正在执行第 {idx + 1}/{len(ids_to_run)} 个任务: 玩家ID {player_id}", "info")
+            self.log(f"正在执行第 {idx + 1}/{len(ids_to_run)} 个任务: 玩家ID {player_id}")
 
             result_message = ""
             token = self.login(player_id, password)
             if not token:
                 result_message = "领取失败"
+                with open(self.results_file, 'a') as file:
+                    file.write(f"{datetime.now()} 玩家 {player_id} 登录失败\n")
                 failed_ids.add(player_id)
             else:
                 checkin_details = self.get_checkin_details(token, player_id)
                 if not checkin_details:
                     result_message = "领取失败"
+                    with open(self.results_file, 'a') as file:
+                        file.write(f"{datetime.now()} 玩家 {player_id} 获取每日签到详情失败\n")
                     failed_ids.add(player_id)
                 else:
                     no_task = True
@@ -159,26 +163,32 @@ class App:
                                     checkin_response = self.daily_checkin(token, player_id, checkin_day)
                                     if checkin_response and checkin_response['code'] == 1:
                                         result_message = "领取成功"
+                                        with open(self.results_file, 'a') as file:
+                                            file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到成功\n")
                                         successful_ids.add(player_id)
                                         break
                                     else:
-                                        self.log(f"第{checkin_day}天签到失败，重试 {attempt}/5 次: {checkin_response}", "warning")
+                                        self.log(f"第{checkin_day}天签到失败，重试 {attempt}/5 次: {checkin_response}", "error")
                                         time.sleep(2)
                                 else:
                                     result_message = "领取失败"
+                                    with open(self.results_file, 'a') as file:
+                                        file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到最终失败: {checkin_response}\n")
                                     failed_ids.add(player_id)
                     if no_task:
                         result_message = "领取成功"
+                        with open(self.results_file, 'a') as file:
+                            file.write(f"{datetime.now()} 玩家 {player_id} 没有可领取的每日签到任务或任务已完成\n")
                         successful_ids.add(player_id)
 
-            self.log(f"玩家ID {player_id} {result_message}", "info")
+            self.log(f"玩家ID {player_id} {result_message}")
 
             # 添加延迟，模拟人类操作
             time.sleep(random.randint(3, 6))
 
-        self.log("领取任务完成", "info")
-        self.log(f"成功的ID总数: {len(successful_ids)}", "info")
-        self.log(f"失败的ID总数: {len(failed_ids)}", "info")
+        self.log("领取任务完成")
+        self.log(f"成功的ID总数: {len(successful_ids)}")
+        self.log(f"失败的ID总数: {len(failed_ids)}")
         self.is_running = False
 
     def read_ids_and_passwords(self, filename):
@@ -192,7 +202,7 @@ class App:
                     elif len(parts) == 2 and parts[1].isdigit() and len(parts[1]) == 6:
                         ids_and_passwords.append((parts[0], parts[1]))  # ID和6位数字密码
         except FileNotFoundError:
-            self.log(f"文件 {filename} 未找到", "error")
+            self.log(f"文件 {filename} 未找到")
         return ids_and_passwords
 
     def read_results(self, filename):
@@ -213,7 +223,7 @@ class App:
                         else:
                             failed_ids.add(player_id)
         except FileNotFoundError:
-            self.log(f"文件 {filename} 未找到", "error")
+            self.log(f"文件 {filename} 未找到")
         return successful_ids, failed_ids
 
     def login(self, player_id, password):
@@ -231,9 +241,9 @@ class App:
                 if response.status_code == 200 and 'Authorization' in response.headers:
                     return response.headers['Authorization']
                 else:
-                    self.log(f"玩家 {player_id} 登录失败，状态码: {response.status_code}, 响应: {response.text}", "error")
-        except requests.exceptions.RequestException as e:
-            self.log(f"玩家 {player_id} 登录请求失败: {e}", "error")
+                    self.log(f"玩家ID {player_id} 登录失败", "error")
+        except requests.exceptions.RequestException:
+            pass
         return None
 
     def get_checkin_details(self, token, player_id):
