@@ -16,13 +16,13 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 announcement_url = 'https://gg.xmg888.top/'
 
 # 设置上传玩家ID的API URL
-upload_url = 'https://kopqd.xmg888.top/api/upload_id'
+upload_url = 'https://kopqd.xmg888.top/api/upload_id.php'
 
 # 设置服务器获取日志的API URL
-log_url = 'https://kopqd.xmg888.top/api/get_logs'
+log_url = 'https://kopqd.xmg888.top/api/get_logs.php'
 
 # 卡密验证和状态检查的URL
-verify_code_url = 'https://kopqd.xmg888.top/api/verify_code'
+verify_code_url = 'https://kopqd.xmg888.top/api/verify_code.php'
 
 # 配置文件路径
 config_file = 'config.json'
