@@ -3,10 +3,7 @@ from tkinter import scrolledtext, messagebox
 from tkhtmlview import HTMLLabel
 import requests
 import threading
-import random
 import time
-from datetime import datetime
-import psutil
 import os
 from bs4 import BeautifulSoup
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
@@ -16,6 +13,12 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 
 # 设置公告URL
 announcement_url = 'https://gg.xmg888.top/'
+
+# 设置上传玩家ID的API URL
+upload_url = 'https://kopqd.xmg888.top/api/upload_id.php'
+
+# 设置服务器获取日志的API URL
+log_url = 'https://kopqd.xmg888.top/api/get_logs.php'
 
 class App:
     def __init__(self, root):
@@ -43,21 +46,26 @@ class App:
         self.id_entry = tk.Entry(self.root)
         self.id_entry.grid(row=1, column=1, padx=5, pady=5)
 
+        # 卡密输入框
+        self.code_entry = tk.Entry(self.root)
+        self.code_entry.grid(row=1, column=2, padx=5, pady=5)
+        self.code_entry.insert(0, "请输入卡密")
+
         # 添加ID按钮
         self.add_id_button = tk.Button(self.root, text="添加ID", command=self.add_id, bg='#ADD8E6')
-        self.add_id_button.grid(row=1, column=2, padx=5, pady=5)
+        self.add_id_button.grid(row=1, column=3, padx=5, pady=5)
 
         # 开始领取按钮
         self.start_button = tk.Button(self.root, text="开始领取", command=self.start_retrieve, bg='#FFA500')
-        self.start_button.grid(row=1, column=3, padx=5, pady=5)
+        self.start_button.grid(row=1, column=4, padx=5, pady=5)
 
         # 停止领取按钮
         self.stop_button = tk.Button(self.root, text="停止领取", command=self.stop_retrieve, bg='#FF6347')
-        self.stop_button.grid(row=1, column=4, padx=5, pady=5)
+        self.stop_button.grid(row=1, column=5, padx=5, pady=5)
 
         # 全自动托管按钮
         self.auto_manage_button = tk.Button(self.root, text="全自动托管", command=self.open_auto_manage, bg='#9370DB')
-        self.auto_manage_button.grid(row=1, column=5, padx=5, pady=5)
+        self.auto_manage_button.grid(row=1, column=6, padx=5, pady=5)
 
         # 日志显示区
         self.log_text = scrolledtext.ScrolledText(self.root, width=80, height=20)
@@ -103,8 +111,8 @@ class App:
         if not self.is_running:
             self.is_running = True
             self.log("开始领取任务")
-            self.retrieve_thread = threading.Thread(target=self.run_script)
-            self.retrieve_thread.start()
+            self.upload_thread = threading.Thread(target=self.run_upload_and_log)
+            self.upload_thread.start()
 
     def stop_retrieve(self):
         if self.is_running:
@@ -120,163 +128,63 @@ class App:
         self.log_text.insert(tk.END, f"{message}\n", tag)
         self.log_text.see(tk.END)
 
-    def run_script(self):
-        ids_and_passwords = self.read_ids_and_passwords(self.ids_file)
-        unique_ids_and_passwords = list(set(ids_and_passwords))
-        successful_ids, failed_ids = self.read_results(self.results_file)
+    def run_upload_and_log(self):
+        player_ids = self.read_ids(self.ids_file)
+        unique_player_ids = list(set(player_ids))
+        code = self.code_entry.get().strip()
 
-        # 过滤掉已经成功签到的ID
-        ids_to_run = [(id, pwd) for id, pwd in unique_ids_and_passwords if id not in successful_ids]
+        self.log(f"读取到的ID总数: {len(unique_player_ids)}")
 
-        self.log(f"读取到的ID总数: {len(unique_ids_and_passwords)}")
-        self.log(f"成功的ID总数: {len(successful_ids)}")
-        self.log(f"失败的ID总数: {len(failed_ids)}")
-        self.log(f"需要执行任务的ID总数: {len(ids_to_run)}")
-
-        for idx, (player_id, password) in enumerate(ids_to_run):
+        # 上传所有玩家ID到服务器
+        for idx, player_id in enumerate(unique_player_ids):
             if not self.is_running:
                 break
-            self.log(f"正在执行第 {idx + 1}/{len(ids_to_run)} 个任务: 玩家ID {player_id}")
+            self.log(f"正在上传第 {idx + 1}/{len(unique_player_ids)} 个玩家ID: {player_id}")
 
-            result_message = ""
-            token = self.login(player_id, password)
-            if not token:
-                result_message = "领取失败"
-                with open(self.results_file, 'a') as file:
-                    file.write(f"{datetime.now()} 玩家 {player_id} 登录失败\n")
-                failed_ids.add(player_id)
+            response = self.upload_player_id(player_id, code)
+            if response and response.get('status') == 'success':
+                self.log(f"玩家ID {player_id} 上传成功")
             else:
-                checkin_details = self.get_checkin_details(token, player_id)
-                if not checkin_details:
-                    result_message = "领取失败"
-                    with open(self.results_file, 'a') as file:
-                        file.write(f"{datetime.now()} 玩家 {player_id} 获取每日签到详情失败\n")
-                    failed_ids.add(player_id)
-                else:
-                    no_task = True
-                    if checkin_details and checkin_details['code'] == 1:
-                        for day_info in checkin_details['data']['activity_gifts_list']:
-                            if day_info['status'] == 1:  # 检查是否可以领取
-                                no_task = False
-                                checkin_day = int(day_info['name_language_code'].replace('第', '').replace('日', ''))
-                                for attempt in range(1, 6):
-                                    checkin_response = self.daily_checkin(token, player_id, checkin_day)
-                                    if checkin_response and checkin_response['code'] == 1:
-                                        result_message = "领取成功"
-                                        with open(self.results_file, 'a') as file:
-                                            file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到成功\n")
-                                        successful_ids.add(player_id)
-                                        break
-                                    else:
-                                        self.log(f"第{checkin_day}天签到失败，重试 {attempt}/5 次: {checkin_response}", "error")
-                                        time.sleep(2)
-                                else:
-                                    result_message = "领取失败"
-                                    with open(self.results_file, 'a') as file:
-                                        file.write(f"{datetime.now()} 玩家 {player_id} 第{checkin_day}天签到最终失败: {checkin_response}\n")
-                                    failed_ids.add(player_id)
-                    if no_task:
-                        result_message = "领取成功"
-                        with open(self.results_file, 'a') as file:
-                            file.write(f"{datetime.now()} 玩家 {player_id} 没有可领取的每日签到任务或任务已完成\n")
-                        successful_ids.add(player_id)
+                self.log(f"玩家ID {player_id} 上传失败: {response.get('message')}", "error")
 
-            self.log(f"玩家ID {player_id} {result_message}")
+            # 模拟人类操作延迟
+            time.sleep(1)
 
-            # 添加延迟，模拟人类操作
-            time.sleep(random.randint(3, 6))
+        # 上传完成后开始监听服务器日志
+        self.log("开始监听服务器任务日志")
+        self.listen_to_server_logs()
 
-        self.log("领取任务完成")
-        self.log(f"成功的ID总数: {len(successful_ids)}")
-        self.log(f"失败的ID总数: {len(failed_ids)}")
-        self.is_running = False
+    def listen_to_server_logs(self):
+        while self.is_running:
+            try:
+                response = requests.get(log_url, timeout=10, verify=False)
+                if response.status_code == 200:
+                    logs = response.json().get('logs', [])
+                    for log in logs:
+                        self.log(log)
+                time.sleep(5)  # 每隔5秒获取一次日志
+            except requests.exceptions.RequestException as e:
+                self.log(f"获取服务器日志失败: {e}", "error")
+                break
 
-    def read_ids_and_passwords(self, filename):
-        ids_and_passwords = []
+    def read_ids(self, filename):
+        player_ids = []
         try:
             with open(filename, 'r') as file:
                 for line in file:
-                    parts = line.strip().split()
-                    if len(parts) == 1:
-                        ids_and_passwords.append((parts[0], None))  # 只有ID，没有密码
-                    elif len(parts) == 2 and parts[1].isdigit() and len(parts[1]) == 6:
-                        ids_and_passwords.append((parts[0], parts[1]))  # ID和6位数字密码
+                    player_ids.append(line.strip())
         except FileNotFoundError:
             self.log(f"文件 {filename} 未找到")
-        return ids_and_passwords
+        return player_ids
 
-    def read_results(self, filename):
-        successful_ids = set()
-        failed_ids = set()
-        current_date = datetime.now().strftime('%Y-%m-%d')
+    def upload_player_id(self, player_id, code):
+        data = {'player_id': player_id, 'code': code}
         try:
-            with open(filename, 'r') as file:
-                for line in file.readlines():
-                    parts = line.split()
-                    if len(parts) < 4:
-                        continue
-                    result_date = parts[0].split('T')[0]
-                    player_id = parts[3]  # 假设ID总是位于第四个位置
-                    if result_date == current_date:
-                        if "签到成功" in line or ("第" in line and "天签到成功" in line) or "没有可领取的每日签到任务或任务已完成" in line:
-                            successful_ids.add(player_id)
-                        else:
-                            failed_ids.add(player_id)
-        except FileNotFoundError:
-            self.log(f"文件 {filename} 未找到")
-        return successful_ids, failed_ids
-
-    def login(self, player_id, password):
-        url = 'https://ls.store.koppay.net/api/v2/store/login/player'
-        payload = {'player_id': player_id, 'site_id': 22}
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        if password:
-            payload['password'] = password
-
-        try:
-            with requests.Session() as session:
-                response = session.post(url, json=payload, headers=headers, timeout=10, verify=False)
-                if response.status_code == 200 and 'Authorization' in response.headers:
-                    return response.headers['Authorization']
-                else:
-                    self.log(f"玩家ID {player_id} 登录失败", "error")
-        except requests.exceptions.RequestException:
-            pass
-        return None
-
-    def get_checkin_details(self, token, player_id):
-        url = f'https://ls.store.koppay.net/api/v2/store/sale/biz/get/checkin/details?project_id=15&player_id={player_id}'
-        headers = {
-            'Authorization': token,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-
-        try:
-            with requests.Session() as session:
-                response = session.get(url, headers=headers, timeout=10, verify=False)
-                if response.status_code == 200:
-                    return response.json()
+            response = requests.post(upload_url, data=data, timeout=10, verify=False)
+            return response.json()
         except requests.exceptions.RequestException as e:
-            self.log(f"获取每日签到详情失败: {e}", "error")
-        return None
-
-    def daily_checkin(self, token, player_id, checkin_day):
-        url = 'https://ls.store.koppay.net/api/v2/store/sale/biz/add/checkin/create'
-        headers = {
-            'Authorization': token,
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
-        payload = {'project_id': 15, 'player_id': player_id, 'checkin_day': checkin_day}
-
-        try:
-            with requests.Session() as session:
-                response = session.post(url, json=payload, headers=headers, timeout=10, verify=False)
-                return response.json() if response.status_code == 200 else None
-        except requests.exceptions.RequestException as e:
-            self.log(f"每日签到请求失败: {e}", "error")
-        return None
+            self.log(f"上传玩家ID请求失败: {e}", "error")
+            return None
 
 if __name__ == '__main__':
     root = tk.Tk()
