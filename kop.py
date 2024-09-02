@@ -218,18 +218,14 @@ class App:
             self.log(f"文件 {filename} 未找到")
         return player_ids
 
-   def upload_player_id(self, player_id):
-    data = {
-        'player_id': player_id,
-        'code': self.config.get('code')  # 从配置中获取已经登录成功的卡密信息
-    }
-    try:
-        response = requests.post(upload_url, data=data, timeout=10, verify=False)
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        self.log(f"上传玩家ID请求失败: {e}", "error")
-        return None
-
+    def upload_player_id(self, player_id):
+        data = {'player_id': player_id, 'code': self.config.get('code')}
+        try:
+            response = requests.post(upload_url, data=data, timeout=10, verify=False)
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            self.log(f"上传玩家ID请求失败: {e}", "error")
+            return None
 
 
 if __name__ == '__main__':
