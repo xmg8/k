@@ -106,21 +106,24 @@ class App:
         with open(config_file, 'w') as f:
             json.dump(self.config, f)
 
-    def login(self):
-        code = self.code_entry.get().strip()
-        if not code:
-            messagebox.showwarning("输入错误", "请输入有效的卡密")
-            return
+   def login(self):
+    code = self.code_entry.get().strip()
+    if not code:
+        messagebox.showwarning("输入错误", "请输入有效的卡密")
+        return
 
-        self.config['code'] = code
-        self.save_config()
+    self.config['code'] = code
+    self.save_config()
 
-        response = self.verify_code(code)
-        if response and response.get('status') == 'success':
-            self.log("卡密验证成功")
-            self.status_label.config(text=f"状态: {response.get('message')}")
-        else:
-            self.log(f"卡密验证失败: {response.get('message')}", "error")
+    response = self.verify_code(code)
+    if response and response.get('status') == 'success':
+        self.log("卡密验证成功")
+        self.status_label.config(text=f"状态: {response.get('message')}")
+    elif response:
+        self.log(f"卡密验证失败: {response.get('message')}", "error")
+    else:
+        self.log("卡密验证失败: 未收到有效响应", "error")
+
 
     def verify_code(self, code):
         data = {'code': code}
