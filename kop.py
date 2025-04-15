@@ -15,10 +15,10 @@ from werkzeug.security import generate_password_hash, check_password_hash # 仍�
 # !!! 重要安全提示 !!!
 # !!! 不要在生产环境中硬编码密码 !!!
 # !!! 考虑使用环境变量、配置文件或更安全的凭证管理方法 !!!
-MYSQL_HOST = "your_mysql_host"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
-MYSQL_USER = "your_mysql_username" # 替换为你的 MySQL 用户名
-MYSQL_PASSWORD = "your_mysql_password" # 替换为你的 MySQL 密码
-MYSQL_DATABASE = "your_database_name" # 替换为你的数据库名称
+MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
+MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
+MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
+MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
 
 # --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
