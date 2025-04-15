@@ -1,3 +1,4 @@
+# 你提供的最新代码 (已包含你对日志的修改)
 import requests
 import time
 from urllib.parse import urlencode
@@ -78,9 +79,7 @@ class SmsApp:
         self.logged_in_user_id = None; self.logged_in_username = None; self.remaining_uses = 0
 
         self._create_main_widgets()
-        # --- 绑定窗口关闭事件 ---
         self.root.protocol("WM_DELETE_WINDOW", self._on_app_closing)
-        # --- 结束绑定 ---
         self.root.after(10, self.show_login_window)
 
     def _create_main_widgets(self):
@@ -121,23 +120,25 @@ class SmsApp:
         LoginWindow(self.root, self)
 
     def on_login_success(self, user_id, username, remaining_uses):
+        # --- 你修改后的版本 ---
         self.logged_in_user_id = user_id; self.logged_in_username = username;
         cached_uses = self._read_usage_cache()
         if cached_uses is not None and cached_uses <= remaining_uses:
              self.remaining_uses = cached_uses
-             self.log_message(f"用户 {username} 登录成功 (使用缓存次数)")
+            # 移除日志
         else:
              self.remaining_uses = remaining_uses
              self._write_usage_cache(remaining_uses)
-             self.log_message(f"用户 {username} 登录成功 (使用数据库次数)")
-        self.root.deiconify(); self.root.title(f"无尽冬日接码工具 - 用户: {username}")
+            # 移除日志
+        self.root.deiconify(); self.root.title(f"无尽冬日 - 用户: {username}") # 你修改了标题
         self.username_var.set(username); self.uses_var.set(str(self.remaining_uses))
         self.status_var.set("登录成功，正在初始化 API...")
-        self.log_message(f"剩余次数: {self.remaining_uses}")
+        # 移除日志
         self.start_initial_login_thread()
         self.update_ui_state(False)
+        # 移除日志
 
-    # --- 日志、状态、UI 更新 (保持不变) ---
+    # --- 日志、状态、UI 更新 ---
     def log_message(self, message, level="INFO"):
         if level == "INFO" and self.root: self.root.after(0, self._append_log, message)
     def _append_log(self, message):
@@ -175,15 +176,15 @@ class SmsApp:
                      self.set_status(status_msg)
         except tk.TclError: pass
 
-    # --- 启动后台任务的方法 (保持不变) ---
+    # --- 启动后台任务的方法 ---
     def start_initial_login_thread(self):
         self.set_status("正在初始化 API 连接...")
         thread = threading.Thread(target=self._initial_login_task, daemon=True); thread.start()
     def start_get_phone_thread(self):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
         if self.is_working: return
-        if self.remaining_uses <= 0: messagebox.showwarning("次数不足", "您的剩余使用次数不足，请联系管理员充值。"); self.log_message("次数不足，请联系管理员充值。"); return
-        if not self.token or not self.server: messagebox.showerror("错误", "API 连接未就绪"+ADMIN_CONTACT_MSG); return
+        if self.remaining_uses <= 0: messagebox.showwarning("次数不足", "您的剩余使用号码数量不足，请联系管理员充值。"); self.log_message("可用号码数量不足，请联系管理员充值。"); return # 你修改了提示信息
+        if not self.token or not self.server: messagebox.showerror("错误", "连接未就绪"+ADMIN_CONTACT_MSG); return
         if self.auto_fetch_job:
             try: self.root.after_cancel(self.auto_fetch_job)
             except tk.TclError: pass
@@ -216,16 +217,13 @@ class SmsApp:
     def _initial_login_task(self):
         """后台初始化好猪码 Token (每次启动都获取)"""
         try:
-            # --- 修改：总是尝试登录获取新 Token ---
-            self.try_login()
-            self.log_message("API 连接初始化成功。")
+            self.try_login() # 总是尝试登录获取新 Token
+            # --- 你已移除 API 初始化成功日志 ---
             self.root.after(0, self.update_ui_state, False)
         except Exception: # 捕获 try_login 可能抛出的异常
-            # 致命错误
             self.log_message(GENERIC_ERROR_MSG, level="ERROR")
             self.root.after(0, lambda: messagebox.showerror("API 错误", "无法初始化接码服务"+ADMIN_CONTACT_MSG))
             self.set_status("API 连接失败"+ADMIN_CONTACT_MSG)
-            # 注意：即使 API 初始化失败，用户界面仍然保持登录状态，但获取号码会失败
 
     def _get_phone_task(self):
         phone_obtained = False
@@ -236,7 +234,7 @@ class SmsApp:
                 self.root.after(0, lambda p=phone: self.phone_var.set(p))
                 self.root.after(0, self.update_ui_state, False)
                 self._play_sound_if_enabled("SystemAsterisk")
-                self.log_message("获取成功，10 秒后开始接收验证码...")
+                self.log_message("号码获取成功，10 秒后开始接收验证码...") # 你修改了日志
                 self.set_status("等待获取验证码 (10s)...")
                 try: self.auto_fetch_job = self.root.after(10000, self.start_automatic_code_fetch)
                 except tk.TclError: phone_obtained = False
@@ -251,7 +249,7 @@ class SmsApp:
             if code:
                 self.root.after(0, lambda c=code: self.code_var.set(c))
                 self._play_sound_if_enabled("SystemHand")
-                if not self._decrement_usage(): # 尝试扣减次数
+                if not self._decrement_usage():
                      messagebox.showerror("错误", "扣减次数失败"+ADMIN_CONTACT_MSG)
                      self.root.after(0, self.update_ui_state, False); return
                 self.root.after(0, self.update_ui_state, False)
@@ -279,7 +277,7 @@ class SmsApp:
             self.root.after(50, self.start_get_phone_thread)
         except tk.TclError: pass
 
-    # --- 数据库交互方法 (使用 MySQL, 带重试) ---
+    # --- 数据库交互方法 ---
     def _get_db_connection(self):
         last_error = None
         for attempt in range(DB_RETRY_COUNT):
@@ -299,12 +297,12 @@ class SmsApp:
             cursor.execute(sql, (self.logged_in_user_id,))
             conn.commit()
             if self.remaining_uses > 0: self.remaining_uses -= 1
-            self._write_usage_cache(self.remaining_uses) # 更新缓存
-            self.log_message(f"次数已扣减，剩余: {self.remaining_uses}")
+            self._write_usage_cache(self.remaining_uses)
+            self.log_message(f"可用号码数量已扣减，剩余: {self.remaining_uses}") # 你修改了日志
             self.root.after(0, lambda: self.uses_var.set(str(self.remaining_uses)))
-            return True # 扣减成功
-        except MySQLError: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False # 数据库错误视为致命
-        except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False # 其他异常视为致命
+            return True
+        except MySQLError: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
+        except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
         finally:
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
@@ -321,7 +319,7 @@ class SmsApp:
         if encoded:
             try:
                 with open(CACHE_FILE, 'w') as f: f.write(encoded)
-            except IOError: pass # 忽略写入错误
+            except IOError: pass
     def _read_usage_cache(self):
         if os.path.exists(CACHE_FILE):
             try:
@@ -330,64 +328,42 @@ class SmsApp:
             except IOError: return None
         return None
     def _delete_usage_cache(self):
-        """尝试删除缓存文件"""
         try:
-            if os.path.exists(CACHE_FILE):
-                os.remove(CACHE_FILE)
-                self.log_message("本地缓存已清除。") # 可以选择记录或不记录
-        except OSError:
-            pass # 忽略删除错误
+            if os.path.exists(CACHE_FILE): os.remove(CACHE_FILE)
+            # 不再记录缓存清除日志
+        except OSError: pass
 
-    # --- API 交互方法 (好猪码部分，移除 Token 读写) ---
-    # def read_token(self): # 移除
-    #     pass
-    # def save_token(self): # 移除
-    #     pass
-    def try_login(self): # 修改：不再保存 Token 到文件
-        """使用好猪码账号密码尝试登录"""
+    # --- API 交互方法 ---
+    # 移除 read_token 和 save_token
+    def try_login(self):
         for s in SERVERS:
             login_url = f"{s}/sms/?api=login&user={API_ACCOUNT}&pass={API_PASSWORD}"
             try:
                 response = requests.get(login_url, headers=headers, timeout=15, verify=True)
                 response.raise_for_status(); data = response.json()
-                if data.get("code") == 0 or str(data.get("code")) == "0":
-                    self.server = s
-                    self.token = data["token"] # 只存储在内存
-                    # self.save_token() # 不再保存
-                    return # 登录成功
+                if data.get("code") == 0 or str(data.get("code")) == "0": self.server = s; self.token = data["token"]; return
             except requests.exceptions.RequestException: pass
             except Exception: pass
         self.server = None; self.token = None
         raise Exception("API 登录失败")
     def handle_api_error(self, data, operation_name):
-        """处理好猪码 API 返回的错误"""
         error_code = data.get("code"); error_msg = data.get('msg', '未知错误')
         is_waiting_msg = "尚未接收" in error_msg or "等待" == error_msg or "没有可用" in error_msg
-        if str(error_code) == TOKEN_EXPIRED_ERROR_CODE: self.log_message("API 令牌过期，尝试重连..."); self.token = None
-        elif error_code != 0 and str(error_code) != "0" and not is_waiting_msg: pass # 忽略非致命 API 错误日志
+        if str(error_code) == TOKEN_EXPIRED_ERROR_CODE: self.log_message("尝试重连..."); self.token = None # 你修改了日志
+        elif error_code != 0 and str(error_code) != "0" and not is_waiting_msg: pass
         if str(error_code) == TOKEN_EXPIRED_ERROR_CODE:
             try: self.try_login(); return True
-            except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("API 错误", "API 令牌过期且无法自动重新登录"+ADMIN_CONTACT_MSG)); return False
+            except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("发生致命错误", "无法自动登录"+ADMIN_CONTACT_MSG)); return False # 你修改了弹窗标题
         if error_code != 0 and str(error_code) != "0" and not is_waiting_msg and str(error_code) != TOKEN_EXPIRED_ERROR_CODE: return False
         return True
-    def get_balance(self): # 不再核心使用
-        if not self.token or not self.server: return None
-        url = f"{self.server}/sms/?api=getSummary&token={self.token}"
-        try:
-            response = requests.get(url, headers=headers, timeout=10, verify=True)
-            data = response.json()
-            if data.get("code") == 0 or str(data.get("code")) == "0": return data.get("money", "未知")
-            else:
-                if self.handle_api_error(data, "获取余额"): return self.get_balance()
-                return None
-        except requests.exceptions.RequestException: return None
-        except Exception: return None # 忽略获取余额的未知异常
+    # --- 移除 get_balance 方法 ---
+    # def get_balance(self): ...
     def get_phone_number(self):
-        if not self.token or not self.server: self.log_message("API 未初始化"+ADMIN_CONTACT_MSG, level="ERROR"); return None # API未初始化是致命错误
+        if not self.token or not self.server: self.log_message("未初始化"+ADMIN_CONTACT_MSG, level="ERROR"); return None
         url = f"{self.server}/sms/?api=getPhone&token={self.token}&sid={PROJECT_ID}"
         retry_delay = 3; self.log_message("正在获取手机号...")
         while True:
-            if not self.token: self.log_message("API 令牌失效"+ADMIN_CONTACT_MSG, level="ERROR"); return None
+            if not self.token: self.log_message("失效"+ADMIN_CONTACT_MSG, level="ERROR"); return None # 你修改了日志
             try:
                 response = requests.get(url, headers=headers, timeout=20, verify=True)
                 data = response.json(); code = data.get("code"); msg = data.get("msg", "")
@@ -398,7 +374,7 @@ class SmsApp:
                 elif str(code) == "-1" and ("没有可用手机号" in msg or "请稍后再试" in msg or "等待" == msg): time.sleep(retry_delay); continue
                 else:
                     if self.handle_api_error(data, "获取手机号"): url = f"{self.server}/sms/?api=getPhone&token={self.token}&sid={PROJECT_ID}"; continue
-                    else: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("API 错误", "获取手机号失败"+ADMIN_CONTACT_MSG)); self.phone_number = None; return None
+                    else: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("错误", "获取手机号失败"+ADMIN_CONTACT_MSG)); self.phone_number = None; return None
             except requests.exceptions.RequestException: time.sleep(5); continue
             except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); self.phone_number = None; return None
     def wait_for_verification_code(self, timeout=200):
@@ -418,7 +394,7 @@ class SmsApp:
                 elif "尚未接收到短信" in msg or (code == -1 and msg == "等待"): pass
                 else:
                     if self.handle_api_error(data, "获取验证码"): url = f"{self.server}/sms/?{urlencode(params)}"; continue
-                    else: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("API 错误", "获取验证码失败"+ADMIN_CONTACT_MSG)); return None
+                    else: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("666错误", "获取验证码失败"+ADMIN_CONTACT_MSG)); return None # 你修改了弹窗标题
             except requests.exceptions.RequestException: pass
             except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.root.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); return None
             time.sleep(polling_interval)
@@ -459,12 +435,11 @@ class SmsApp:
             try: winsound.PlaySound(sound_alias, winsound.SND_ALIAS | winsound.SND_ASYNC)
             except Exception: pass
     def _on_app_closing(self):
-        """应用程序主窗口关闭时调用"""
-        self._delete_usage_cache() # 删除缓存文件
-        self.root.destroy() # 关闭窗口
+        self._delete_usage_cache()
+        self.root.destroy()
 
 
-# --- 登录窗口类 (极简版，移除注册) ---
+# --- 登录窗口类 ---
 class LoginWindow(Toplevel):
     def __init__(self, parent, app_instance):
         super().__init__(parent)
