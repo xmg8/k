@@ -12,10 +12,13 @@ from mysql.connector import Error as MySQLError
 from werkzeug.security import generate_password_hash, check_password_hash # 仍然需要 check_password_hash
 
 # --- MySQL Database Configuration ---
-MYSQL_HOST = "152.136.171.223"
-MYSQL_USER = "wxxmg888"
-MYSQL_PASSWORD = "xmg888.top"
-MYSQL_DATABASE = "wxxmg888"
+# !!! 重要安全提示 !!!
+# !!! 不要在生产环境中硬编码密码 !!!
+# !!! 考虑使用环境变量、配置文件或更安全的凭证管理方法 !!!
+MYSQL_HOST = "your_mysql_host"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
+MYSQL_USER = "your_mysql_username" # 替换为你的 MySQL 用户名
+MYSQL_PASSWORD = "your_mysql_password" # 替换为你的 MySQL 密码
+MYSQL_DATABASE = "your_database_name" # 替换为你的数据库名称
 
 # --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
@@ -27,7 +30,7 @@ SERVERS = [
     "https://api.haozhuyun.com",
     "https://api.haozhuyun.cn"
 ]
-TOKEN_EXPIRED_ERROR_CODE = "E0008"
+TOKEN_EXPIRED_ERROR_CODE = "E0008" # 示例: 替换为实际错误码
 
 # --- 路径处理 ---
 if getattr(sys, 'frozen', False):
@@ -42,32 +45,38 @@ headers = {
 
 # --- 数据库连接测试 ---
 def test_database_connection():
+    """测试到 MySQL 数据库的连接"""
     try:
         conn = mysql.connector.connect(
-            host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE
+            host=MYSQL_HOST,
+            user=MYSQL_USER,
+            password=MYSQL_PASSWORD,
+            database=MYSQL_DATABASE
         )
-        if conn.is_connected(): conn.close(); return True
+        if conn.is_connected():
+            print("MySQL 数据库连接成功。") # 可以改为日志
+            conn.close()
+            return True
     except MySQLError as e:
         print(f"MySQL 数据库连接错误: {e}")
         messagebox.showerror("数据库连接错误", f"无法连接到 MySQL 数据库: {e}\n请检查配置或联系管理员。")
         return False
 
-# --- GUI 应用主类 (SmsApp 类保持不变，这里省略以减少重复) ---
+# --- GUI 应用主类 ---
 class SmsApp:
-    # ... (SmsApp 类的所有代码，从 __init__ 到 clear_phone_details，保持不变) ...
-    # ... (请确保将上一版本完整的 SmsApp 类代码粘贴到这里) ...
     def __init__(self, root):
+        """初始化应用程序窗口和变量"""
         self.root = root
         self.root.title("无尽冬日接码工具 - 未登录") # 初始标题
         self.root.geometry("600x480")
         self.root.withdraw() # 初始隐藏主窗口
 
         # 实例变量
-        self.token = None
-        self.phone_number = None
-        self.server = None
-        self.is_working = False
-        self.auto_fetch_job = None
+        self.token = None           # API 访问令牌
+        self.phone_number = None    # 当前获取到的手机号
+        self.server = None          # 当前使用的 API 服务器地址
+        self.is_working = False     # 标记是否有后台任务正在运行
+        self.auto_fetch_job = None  # 用于存储 Tkinter 的 after 任务 ID，以便取消
 
         # 用户相关状态
         self.logged_in_user_id = None
@@ -77,8 +86,8 @@ class SmsApp:
         # --- 创建主窗口 GUI 元素 ---
         self._create_main_widgets()
 
-        # --- 显示登录/注册窗口 ---
-        self.show_login_register_window()
+        # --- 显示登录窗口 ---
+        self.show_login_window() # 修改方法名
 
     def _create_main_widgets(self):
         """创建主应用程序窗口的控件"""
@@ -87,18 +96,17 @@ class SmsApp:
         control_frame.pack(pady=10, padx=10, fill=tk.X)
         control_frame.columnconfigure(1, weight=1)
 
-        # 剩余次数显示 (替换余额)
+        # 剩余次数显示
         ttk.Label(control_frame, text="剩余次数:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
         self.uses_var = tk.StringVar(value="--") # 初始值
         self.uses_label = ttk.Label(control_frame, textvariable=self.uses_var, width=15, anchor=tk.W)
         self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
 
-        # 用户名显示 (可选)
+        # 用户名显示
         ttk.Label(control_frame, text="当前用户:").grid(row=0, column=2, padx=5, pady=5, sticky=tk.E)
         self.username_var = tk.StringVar(value="未登录")
         self.username_label = ttk.Label(control_frame, textvariable=self.username_var, anchor=tk.E)
         self.username_label.grid(row=0, column=3, padx=5, pady=5, sticky=tk.E)
-
 
         # 手机号码显示
         ttk.Label(control_frame, text="手机号码:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
@@ -136,9 +144,9 @@ class SmsApp:
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
-    def show_login_register_window(self):
+    def show_login_window(self): # 修改方法名
         """显示登录窗口"""
-        LoginWindow(self.root, self) # 修改为 LoginWindow
+        LoginWindow(self.root, self) # 调用 LoginWindow
 
     def on_login_success(self, user_id, username, remaining_uses):
         """登录成功后的回调函数"""
@@ -491,14 +499,14 @@ class SmsApp:
         except tk.TclError: pass
 
 
-# --- 登录窗口类 (移除注册功能) ---
-class LoginWindow(Toplevel): # 重命名类
+# --- 登录窗口类 (极简版，移除注册) ---
+class LoginWindow(Toplevel):
     def __init__(self, parent, app_instance):
         super().__init__(parent)
         self.parent = parent
         self.app = app_instance
-        self.title("用户登录") # 修改标题
-        self.geometry("300x170") # 调整高度
+        self.title("用户登录")
+        self.geometry("300x170")
         self.resizable(False, False)
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
         self.grab_set(); self.transient(parent)
@@ -508,36 +516,34 @@ class LoginWindow(Toplevel): # 重命名类
         ttk.Label(self, text="密  码:").grid(row=1, column=0, padx=10, pady=10, sticky=tk.W)
         self.password_entry = ttk.Entry(self, show="*", width=25); self.password_entry.grid(row=1, column=1, padx=10, pady=10)
 
-        # 按钮框架
-        button_frame = ttk.Frame(self)
-        button_frame.grid(row=2, column=0, columnspan=2, pady=15)
-
+        button_frame = ttk.Frame(self); button_frame.grid(row=2, column=0, columnspan=2, pady=15)
         ttk.Button(button_frame, text="登录", command=self._login).pack(side=tk.LEFT, padx=10)
-        # ttk.Button(button_frame, text="注册", command=self._register).pack(side=tk.LEFT, padx=10) # 移除注册按钮
         ttk.Button(button_frame, text="退出", command=self._on_closing).pack(side=tk.LEFT, padx=10)
 
         self.username_entry.focus_set()
         self.update_idletasks()
-        x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (self.winfo_width() // 2)
-        y = parent.winfo_rooty() + (parent.winfo_height() // 2) - (self.winfo_height() // 2)
+        parent_x = parent.winfo_rootx(); parent_y = parent.winfo_rooty()
+        parent_width = parent.winfo_width(); parent_height = parent.winfo_height()
+        self_width = self.winfo_width(); self_height = self.winfo_height()
+        x = parent_x + (parent_width // 2) - (self_width // 2)
+        y = parent_y + (parent_height // 2) - (self_height // 2)
         self.geometry(f"+{x}+{y}")
 
     def _login(self):
-        """处理登录逻辑"""
         username = self.username_entry.get().strip(); password = self.password_entry.get()
         if not username or not password: messagebox.showwarning("输入错误", "用户名和密码不能为空。", parent=self); return
 
         conn = self.app._get_db_connection(); cursor = None
         if not conn: return
         try:
-            cursor = conn.cursor(dictionary=True) # 使用字典 cursor
+            cursor = conn.cursor(dictionary=True)
             sql = "SELECT id, username, password_hash, remaining_uses FROM users WHERE username = %s"
             cursor.execute(sql, (username,))
             user_row = cursor.fetchone()
 
             if user_row and check_password_hash(user_row["password_hash"], password):
                 messagebox.showinfo("登录成功", f"欢迎回来, {username}!", parent=self)
-                self.destroy() # 关闭登录窗口
+                self.destroy()
                 self.app.on_login_success(user_row["id"], user_row["username"], user_row["remaining_uses"])
             else:
                 messagebox.showerror("登录失败", "用户名或密码错误。", parent=self)
@@ -546,14 +552,10 @@ class LoginWindow(Toplevel): # 重命名类
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
 
-    # def _register(self): # 移除注册方法
-    #     pass
-
     def _on_closing(self):
-        """处理窗口关闭事件"""
-        if messagebox.askokcancel("退出", "确定要退出程序吗？", parent=self):
-            self.destroy()
-            self.parent.destroy() # 关闭主窗口 (父窗口)
+        # if messagebox.askokcancel("退出", "确定要退出程序吗？", parent=self): # 不再询问，直接退出
+        self.destroy()
+        self.parent.destroy()
 
 # --- 程序主入口 ---
 if __name__ == "__main__":
