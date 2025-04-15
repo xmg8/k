@@ -512,7 +512,8 @@ class LoginRegisterWindow(Toplevel):
         self.password_entry = ttk.Entry(self, show="*", width=25); self.password_entry.grid(row=1, column=1, padx=10, pady=10)
         button_frame = ttk.Frame(self); button_frame.grid(row=2, column=0, columnspan=2, pady=15)
         ttk.Button(button_frame, text="登录", command=self._login).pack(side=tk.LEFT, padx=10)
-        ttk.Button(button_frame, text="注册", command=self._register).pack(side=tk.LEFT, padx=10)
+        
+        ttk.Button(button_frame, text="注册", command=lambda: self._register()).pack(side=tk.LEFT, padx=10)
         ttk.Button(button_frame, text="退出", command=self._on_closing).pack(side=tk.LEFT, padx=10)
         self.username_entry.focus_set()
         self.update_idletasks()
