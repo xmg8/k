@@ -1,5 +1,5 @@
 # 工作流程名称
-name: Build 无尽冬日接码工具 for Windows (Debug Console)
+name: Build 无尽冬日接码工具 for Windows
 
 # 触发条件：
 # 1. 当有代码推送到 'main' 分支时触发
@@ -33,31 +33,32 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         # 确保你的仓库根目录下有一个 requirements.txt 文件
-        # 包含: requests, pyinstaller, Werkzeug, mysql-connector-python==8.2.0 (或其他可用版本)
+        # 包含: requests, pyinstaller, Werkzeug, mysql-connector-python (使用适合你 MySQL 版本的版本号)
         if (Test-Path requirements.txt) {
           # 强制重新安装并禁用缓存，确保安装最新依赖
           pip install --force-reinstall --no-cache-dir -r requirements.txt
         } else {
           Write-Host "requirements.txt not found, attempting to install packages directly."
           # 如果 requirements.txt 不存在，尝试直接安装（作为备选方案）
+          # 确保这里的 mysql-connector-python 版本正确
           pip install --no-cache-dir requests pyinstaller Werkzeug mysql-connector-python==8.2.0
         }
         # 再次确保 pyinstaller 已安装
         pip install pyinstaller
 
-    # 第四步：使用 PyInstaller 打包脚本 (使用 --console 模式)
+    # 第四步：使用 PyInstaller 打包脚本 (使用 --windowed 模式)
     # --onefile: 打包成单个 .exe 文件
-    # --console: (关键!) 用于调试，运行时显示黑色命令行窗口以查看错误输出
-    # --name "无尽冬日接码工具_debug": 指定生成的 .exe 文件名 (添加 _debug 后缀)
+    # --windowed: (关键!) 用于 GUI 应用，运行时不显示黑色命令行窗口
+    # --name "无尽冬日接码工具": 指定生成的 .exe 文件名
     # kop.py: 你的 Python 脚本文件名
-    - name: Build executable with PyInstaller (Debug Console)
-      run: pyinstaller --onefile --console --name "无尽冬日接码工具_debug" kop.py
+    - name: Build executable with PyInstaller
+      run: pyinstaller --onefile --windowed --name "无尽冬日接码工具" kop.py
 
     # 第五步：上传构建产物 (Artifact)
-    - name: Upload artifact (Debug Console)
+    - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
-        # Artifact 的名称 (修改!)
-        name: WujinDongri-JieMa-Tool-Debug-exe
-        # 要上传的文件路径 (修改!) - 必须与上面 --name 参数生成的 .exe 文件名匹配
-        path: dist/无尽冬日接码工具_debug.exe
+        # Artifact 的名称
+        name: WujinDongri-JieMa-Tool-Windows-exe
+        # 要上传的文件路径 - 必须与上面 --name 参数生成的 .exe 文件名匹配
+        path: dist/无尽冬日接码工具.exe
