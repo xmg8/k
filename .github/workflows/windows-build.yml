@@ -1,35 +1,52 @@
-name: 无尽接码 - Package Python Script
+name: Build Python Executable for Windows
 
+# 触发条件：当有代码推送到 main 分支时触发
 on:
   push:
-    branches:
-      - main  # 可根据需求修改分支名称
+    branches: [ "main" ] # 你可以改成你的主分支名，比如 master
+  # 或者，你也可以设置为当创建 Release 时触发：
+  # release:
+  #   types: [created]
 
 jobs:
   build:
-    runs-on: windows-latest  # 选择 Windows 系统进行打包，因为要生成 .exe 文件
+    # 指定运行环境为最新的 Windows 系统
+    runs-on: windows-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    # 第一步：签出（Checkout）代码
+    # 这个 Action 会把你的仓库代码下载到 Runner 环境中
+    - name: Checkout repository
+      uses: actions/checkout@v4 # 使用官方的 checkout action
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: 3.9  # 可根据你的 Python 版本修改
+    # 第二步：设置 Python 环境
+    # 指定要使用的 Python 版本
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10' # 你可以指定你需要的 Python 版本
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install pyinstaller
-          pip install requests PyQt5
+    # 第三步：安装依赖项
+    # 安装 requirements.txt 中列出的所有库，以及 PyInstaller
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pyinstaller
 
-      - name: Package script
-        run: pyinstaller --onefile --windowed --name 无尽接码 sms_verification_code_gui.py
+    # 第四步：使用 PyInstaller 打包脚本
+    # --onefile: 打包成单个 exe 文件
+    # --noconsole: （可选）如果你的脚本是图形界面或不需要命令行窗口，可以使用这个。
+    #             对于你的脚本，它会打印输出，所以建议 *不要* 加 --noconsole 或使用 --console
+    # --name: 指定生成的 exe 文件名
+    # your_script_name.py: 替换成你的 Python 脚本文件名
+    - name: Build executable with PyInstaller
+      run: pyinstaller --onefile --console --name sms_verifier kop.py
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: 无尽接码-packaged-app
-          path: dist/无尽接码.exe
-    
+    # 第五步：上传构建产物 (Artifact)
+    # 将 dist 目录下生成的 exe 文件上传，方便下载
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sms-verifier-windows-exe # Artifact 的名字
+        path: dist/sms_verifier.exe     # 指定要上传的文件路径 (PyInstaller 默认输出到 dist 目录)
