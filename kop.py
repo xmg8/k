@@ -7,20 +7,17 @@ from tkinter import ttk, scrolledtext, messagebox, simpledialog, Toplevel
 import threading
 import sys
 import ssl
-import mysql.connector # Import MySQL connector
-from mysql.connector import Error as MySQLError # Import specific MySQL error
-from werkzeug.security import generate_password_hash, check_password_hash
+import mysql.connector
+from mysql.connector import Error as MySQLError
+from werkzeug.security import generate_password_hash, check_password_hash # 仍然需要 check_password_hash
 
 # --- MySQL Database Configuration ---
-# !!! 重要安全提示 !!!
-# !!! 不要在生产环境中硬编码密码 !!!
-# !!! 考虑使用环境变量、配置文件或更安全的凭证管理方法 !!!
-MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
-MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
-MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
-MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
+MYSQL_HOST = "152.136.171.223"
+MYSQL_USER = "wxxmg888"
+MYSQL_PASSWORD = "xmg888.top"
+MYSQL_DATABASE = "wxxmg888"
 
-# --- 好猪码 API 配置 (保持不变) ---
+# --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
 API_PASSWORD = "2128c8ba18eba394cbfb99c6c906a9b5199d9f94cd825fbcd30c41a0745281e3"
 PROJECT_ID = "78478"
@@ -38,7 +35,6 @@ if getattr(sys, 'frozen', False):
 else:
     application_path = os.path.dirname(os.path.abspath(__file__))
 TOKEN_FILE = os.path.join(application_path, "token.txt")
-# DATABASE_FILE 不再需要
 
 # --- API 请求头 ---
 headers = {
@@ -46,30 +42,25 @@ headers = {
 
 # --- 数据库连接测试 ---
 def test_database_connection():
-    """测试到 MySQL 数据库的连接"""
     try:
         conn = mysql.connector.connect(
-            host=MYSQL_HOST,
-            user=MYSQL_USER,
-            password=MYSQL_PASSWORD,
-            database=MYSQL_DATABASE
+            host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE
         )
-        if conn.is_connected():
-            print("MySQL 数据库连接成功。") # 可以改为日志
-            conn.close()
-            return True
+        if conn.is_connected(): conn.close(); return True
     except MySQLError as e:
         print(f"MySQL 数据库连接错误: {e}")
         messagebox.showerror("数据库连接错误", f"无法连接到 MySQL 数据库: {e}\n请检查配置或联系管理员。")
         return False
 
-# --- GUI 应用主类 ---
+# --- GUI 应用主类 (SmsApp 类保持不变，这里省略以减少重复) ---
 class SmsApp:
+    # ... (SmsApp 类的所有代码，从 __init__ 到 clear_phone_details，保持不变) ...
+    # ... (请确保将上一版本完整的 SmsApp 类代码粘贴到这里) ...
     def __init__(self, root):
         self.root = root
-        self.root.title("无尽冬日接码工具 - 未登录")
+        self.root.title("无尽冬日接码工具 - 未登录") # 初始标题
         self.root.geometry("600x480")
-        self.root.withdraw()
+        self.root.withdraw() # 初始隐藏主窗口
 
         # 实例变量
         self.token = None
@@ -77,74 +68,97 @@ class SmsApp:
         self.server = None
         self.is_working = False
         self.auto_fetch_job = None
+
+        # 用户相关状态
         self.logged_in_user_id = None
         self.logged_in_username = None
         self.remaining_uses = 0
 
+        # --- 创建主窗口 GUI 元素 ---
         self._create_main_widgets()
+
+        # --- 显示登录/注册窗口 ---
         self.show_login_register_window()
 
     def _create_main_widgets(self):
         """创建主应用程序窗口的控件"""
+        # 主控制框架
         control_frame = ttk.Frame(self.root, padding="10")
         control_frame.pack(pady=10, padx=10, fill=tk.X)
         control_frame.columnconfigure(1, weight=1)
 
+        # 剩余次数显示 (替换余额)
         ttk.Label(control_frame, text="剩余次数:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
-        self.uses_var = tk.StringVar(value="--")
+        self.uses_var = tk.StringVar(value="--") # 初始值
         self.uses_label = ttk.Label(control_frame, textvariable=self.uses_var, width=15, anchor=tk.W)
         self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
 
+        # 用户名显示 (可选)
         ttk.Label(control_frame, text="当前用户:").grid(row=0, column=2, padx=5, pady=5, sticky=tk.E)
         self.username_var = tk.StringVar(value="未登录")
         self.username_label = ttk.Label(control_frame, textvariable=self.username_var, anchor=tk.E)
         self.username_label.grid(row=0, column=3, padx=5, pady=5, sticky=tk.E)
 
+
+        # 手机号码显示
         ttk.Label(control_frame, text="手机号码:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
         self.phone_var = tk.StringVar(value="尚未获取")
         self.phone_entry = ttk.Entry(control_frame, textvariable=self.phone_var, state='readonly', width=20)
         self.phone_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
 
+        # 验证码显示
         ttk.Label(control_frame, text="验证码:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         self.code_var = tk.StringVar(value="尚未获取")
         self.code_entry = ttk.Entry(control_frame, textvariable=self.code_var, state='readonly', width=20)
         self.code_entry.grid(row=2, column=1, padx=5, pady=5, sticky=tk.W)
 
+        # 功能按钮 (初始禁用)
         self.get_phone_btn = ttk.Button(control_frame, text="获取手机号", command=self.start_get_phone_thread, width=15, state=tk.DISABLED)
         self.get_phone_btn.grid(row=1, column=2, padx=(10,5), pady=5, sticky=tk.E)
+
         self.copy_phone_btn = ttk.Button(control_frame, text="复制手机号码", command=self.copy_phone, width=15, state=tk.DISABLED)
         self.copy_phone_btn.grid(row=1, column=3, padx=5, pady=5, sticky=tk.E)
+
         self.copy_code_btn = ttk.Button(control_frame, text="复制验证码", command=self.copy_code, width=15, state=tk.DISABLED)
         self.copy_code_btn.grid(row=2, column=3, padx=5, pady=5, sticky=tk.E)
+
         self.blacklist_btn = ttk.Button(control_frame, text="拉黑手机号码", command=self.start_blacklist_thread, width=15, state=tk.DISABLED)
         self.blacklist_btn.grid(row=3, column=3, padx=5, pady=10, sticky=tk.E)
 
+        # 日志输出区域
         log_frame = ttk.LabelFrame(self.root, text="日志输出", padding="10")
         log_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=10, state=tk.DISABLED)
         self.log_text.pack(fill=tk.BOTH, expand=True)
 
+        # 状态栏
         self.status_var = tk.StringVar(value="请先登录.")
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
 
     def show_login_register_window(self):
-        LoginRegisterWindow(self.root, self)
+        """显示登录窗口"""
+        LoginWindow(self.root, self) # 修改为 LoginWindow
 
     def on_login_success(self, user_id, username, remaining_uses):
+        """登录成功后的回调函数"""
         self.logged_in_user_id = user_id
         self.logged_in_username = username
         self.remaining_uses = remaining_uses
-        self.root.deiconify()
-        self.root.title(f"无尽冬日接码工具 - 用户: {username}")
+
+        self.root.deiconify() # 显示主窗口
+        self.root.title(f"无尽冬日接码工具 - 用户: {username}") # 更新标题
         self.username_var.set(username)
         self.uses_var.set(str(remaining_uses))
         self.status_var.set("登录成功，正在初始化...")
         self.log_message(f"用户 {username} 登录成功，剩余次数: {remaining_uses}")
-        self.start_initial_login_thread()
-        self.update_ui_state(False)
 
-    # --- 日志记录与状态更新方法 (保持不变) ---
+        # 登录成功后，才开始初始化好猪码的 token
+        self.start_initial_login_thread()
+        # 根据剩余次数更新按钮状态
+        self.update_ui_state(False) # 初始为非工作状态
+
+    # --- 日志记录与状态更新方法 ---
     def log_message(self, message):
         if self.root: self.root.after(0, self._append_log, message)
     def _append_log(self, message):
@@ -159,8 +173,9 @@ class SmsApp:
              try: self.root.after(0, self.status_var.set, message)
              except tk.TclError: pass
 
-    # --- UI 状态管理 (保持不变) ---
+    # --- UI 状态管理 ---
     def update_ui_state(self, working):
+        """根据工作状态、登录状态和剩余次数启用/禁用 GUI 元素"""
         self.is_working = working
         is_logged_in = bool(self.logged_in_user_id)
         default_state = tk.DISABLED if working or not is_logged_in else tk.NORMAL
@@ -188,7 +203,7 @@ class SmsApp:
                      self.set_status(status_msg)
         except tk.TclError: pass
 
-    # --- 启动后台任务的方法 (保持不变) ---
+    # --- 启动后台任务的方法 ---
     def start_initial_login_thread(self):
         self.set_status("正在初始化 API 连接...")
         thread = threading.Thread(target=self._initial_login_task, daemon=True)
@@ -240,7 +255,7 @@ class SmsApp:
             thread.start()
         else: self.log_message("拉黑操作已取消。")
 
-    # --- 后台任务方法 (保持不变, 除了 _get_code_task_automatic 调用扣减次数) ---
+    # --- 后台任务方法 ---
     def _initial_login_task(self):
         try:
             if not self.read_token():
@@ -316,51 +331,32 @@ class SmsApp:
     def _get_db_connection(self):
         """获取 MySQL 数据库连接"""
         try:
-            # 尝试连接数据库
             conn = mysql.connector.connect(
-                host=MYSQL_HOST,
-                user=MYSQL_USER,
-                password=MYSQL_PASSWORD,
-                database=MYSQL_DATABASE
+                host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE
             )
-            if conn.is_connected():
-                return conn
-            else:
-                self.log_message("无法连接到 MySQL 数据库。")
-                messagebox.showerror("数据库错误", "无法连接到用户数据库。")
-                return None
-        except MySQLError as e:
-            self.log_message(f"MySQL 连接错误: {e}")
-            messagebox.showerror("数据库错误", f"无法连接到用户数据库: {e}")
-            return None
-
+            if conn.is_connected(): return conn
+            else: self.log_message("无法连接到 MySQL 数据库。"); messagebox.showerror("数据库错误", "无法连接到用户数据库。"); return None
+        except MySQLError as e: self.log_message(f"MySQL 连接错误: {e}"); messagebox.showerror("数据库错误", f"无法连接到用户数据库: {e}"); return None
     def _decrement_usage(self):
         """在 MySQL 数据库中将当前用户的剩余次数减 1"""
         if not self.logged_in_user_id: return
-        conn = self._get_db_connection()
+        conn = self._get_db_connection(); cursor = None
         if not conn: return
-        cursor = None
         try:
             cursor = conn.cursor()
-            # 使用 GREATEST 防止减成负数
             sql = "UPDATE users SET remaining_uses = GREATEST(0, remaining_uses - 1) WHERE id = %s"
             cursor.execute(sql, (self.logged_in_user_id,))
-            conn.commit() # 提交事务
-
-            # 更新内存和 UI
+            conn.commit()
             if self.remaining_uses > 0: self.remaining_uses -= 1
             self.log_message(f"使用次数已扣减，剩余: {self.remaining_uses}")
             self.root.after(0, lambda: self.uses_var.set(str(self.remaining_uses)))
-            self.root.after(0, self.update_ui_state, False) # 更新按钮状态
-
-        except MySQLError as e:
-            self.log_message(f"扣减使用次数时 MySQL 错误: {e}")
-            messagebox.showerror("数据库错误", f"无法更新使用次数: {e}")
+            self.root.after(0, self.update_ui_state, False)
+        except MySQLError as e: self.log_message(f"扣减使用次数时 MySQL 错误: {e}"); messagebox.showerror("数据库错误", f"无法更新使用次数: {e}")
         finally:
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
 
-    # --- API 交互方法 (好猪码部分，保持不变) ---
+    # --- API 交互方法 (好猪码部分) ---
     def read_token(self):
         if os.path.exists(TOKEN_FILE):
             try:
@@ -477,7 +473,7 @@ class SmsApp:
         except Exception as e: self.log_message(f"拉黑手机号未知异常: {e}")
         return False
 
-    # --- GUI 辅助方法 (保持不变) ---
+    # --- GUI 辅助方法 ---
     def copy_phone(self):
         if self.phone_number:
             try: self.root.clipboard_clear(); self.root.clipboard_append(self.phone_number); self.log_message(f"号码 {self.phone_number} 已复制。"); self.set_status("号码已复制。")
@@ -494,14 +490,15 @@ class SmsApp:
         try: self.phone_var.set("已拉黑"); self.code_var.set("尚未获取"); self.update_ui_state(self.is_working)
         except tk.TclError: pass
 
-# --- 登录/注册窗口类 (使用 MySQL) ---
-class LoginRegisterWindow(Toplevel):
+
+# --- 登录窗口类 (移除注册功能) ---
+class LoginWindow(Toplevel): # 重命名类
     def __init__(self, parent, app_instance):
         super().__init__(parent)
         self.parent = parent
         self.app = app_instance
-        self.title("登录或注册")
-        self.geometry("300x200")
+        self.title("用户登录") # 修改标题
+        self.geometry("300x170") # 调整高度
         self.resizable(False, False)
         self.protocol("WM_DELETE_WINDOW", self._on_closing)
         self.grab_set(); self.transient(parent)
@@ -510,11 +507,15 @@ class LoginRegisterWindow(Toplevel):
         self.username_entry = ttk.Entry(self, width=25); self.username_entry.grid(row=0, column=1, padx=10, pady=10)
         ttk.Label(self, text="密  码:").grid(row=1, column=0, padx=10, pady=10, sticky=tk.W)
         self.password_entry = ttk.Entry(self, show="*", width=25); self.password_entry.grid(row=1, column=1, padx=10, pady=10)
-        button_frame = ttk.Frame(self); button_frame.grid(row=2, column=0, columnspan=2, pady=15)
+
+        # 按钮框架
+        button_frame = ttk.Frame(self)
+        button_frame.grid(row=2, column=0, columnspan=2, pady=15)
+
         ttk.Button(button_frame, text="登录", command=self._login).pack(side=tk.LEFT, padx=10)
-        
-        ttk.Button(button_frame, text="注册", command=lambda: self._register()).pack(side=tk.LEFT, padx=10)
+        # ttk.Button(button_frame, text="注册", command=self._register).pack(side=tk.LEFT, padx=10) # 移除注册按钮
         ttk.Button(button_frame, text="退出", command=self._on_closing).pack(side=tk.LEFT, padx=10)
+
         self.username_entry.focus_set()
         self.update_idletasks()
         x = parent.winfo_rootx() + (parent.winfo_width() // 2) - (self.winfo_width() // 2)
@@ -522,21 +523,21 @@ class LoginRegisterWindow(Toplevel):
         self.geometry(f"+{x}+{y}")
 
     def _login(self):
+        """处理登录逻辑"""
         username = self.username_entry.get().strip(); password = self.password_entry.get()
         if not username or not password: messagebox.showwarning("输入错误", "用户名和密码不能为空。", parent=self); return
 
         conn = self.app._get_db_connection(); cursor = None
         if not conn: return
         try:
-            # 使用字典 cursor 获取结果
-            cursor = conn.cursor(dictionary=True)
+            cursor = conn.cursor(dictionary=True) # 使用字典 cursor
             sql = "SELECT id, username, password_hash, remaining_uses FROM users WHERE username = %s"
             cursor.execute(sql, (username,))
             user_row = cursor.fetchone()
 
             if user_row and check_password_hash(user_row["password_hash"], password):
                 messagebox.showinfo("登录成功", f"欢迎回来, {username}!", parent=self)
-                self.destroy()
+                self.destroy() # 关闭登录窗口
                 self.app.on_login_success(user_row["id"], user_row["username"], user_row["remaining_uses"])
             else:
                 messagebox.showerror("登录失败", "用户名或密码错误。", parent=self)
@@ -545,32 +546,14 @@ class LoginRegisterWindow(Toplevel):
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
 
-    def _register(self):
-        username = self.username_entry.get().strip(); password = self.password_entry.get()
-        if not username or not password: messagebox.showwarning("输入错误", "用户名和密码不能为空。", parent=self); return
-        if len(password) < 6: messagebox.showwarning("密码太短", "密码长度至少需要6位。", parent=self); return
-
-        password_h = generate_password_hash(password); initial_uses = 5 # 新用户初始次数
-        conn = self.app._get_db_connection(); cursor = None
-        if not conn: return
-        try:
-            cursor = conn.cursor()
-            sql = "INSERT INTO users (username, password_hash, remaining_uses) VALUES (%s, %s, %s)"
-            cursor.execute(sql, (username, password_h, initial_uses))
-            conn.commit()
-            messagebox.showinfo("注册成功", f"用户 {username} 注册成功！初始次数: {initial_uses}。请现在登录。", parent=self)
-            self.username_entry.delete(0, tk.END); self.password_entry.delete(0, tk.END); self.username_entry.focus_set()
-        except MySQLError as e:
-            # 检查是否是唯一约束冲突错误 (MySQL error code 1062)
-            if e.errno == 1062: messagebox.showerror("注册失败", "该用户名已被注册。", parent=self)
-            else: messagebox.showerror("数据库错误", f"注册时写入数据库出错: {e}", parent=self)
-        finally:
-            if cursor: cursor.close()
-            if conn and conn.is_connected(): conn.close()
+    # def _register(self): # 移除注册方法
+    #     pass
 
     def _on_closing(self):
+        """处理窗口关闭事件"""
         if messagebox.askokcancel("退出", "确定要退出程序吗？", parent=self):
-            self.destroy(); self.parent.destroy()
+            self.destroy()
+            self.parent.destroy() # 关闭主窗口 (父窗口)
 
 # --- 程序主入口 ---
 if __name__ == "__main__":
@@ -580,7 +563,7 @@ if __name__ == "__main__":
 
     # 2. 创建 Tkinter 主窗口 (初始隐藏)
     root = tk.Tk()
-    # 3. 实例化应用程序类 (会触发登录窗口)
+    # 3. 实例化应用程序类 (这会触发登录窗口)
     app = SmsApp(root)
     # 4. 进入 Tkinter 事件循环
     root.mainloop()
