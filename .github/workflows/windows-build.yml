@@ -33,20 +33,16 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pyinstaller
+      # ... (previous steps) ...
 
-    # 第四步：使用 PyInstaller 打包脚本
-    # --onefile: 打包成单个 exe 文件
-    # --noconsole: （可选）如果你的脚本是图形界面或不需要命令行窗口，可以使用这个。
-    #             对于你的脚本，它会打印输出，所以建议 *不要* 加 --noconsole 或使用 --console
-    # --name: 指定生成的 exe 文件名
-    # your_script_name.py: 替换成你的 Python 脚本文件名
-    - name: Build executable with PyInstaller
-      run: pyinstaller --onefile --console --name sms_verifier kop.py
+      # 第四步：使用 PyInstaller 打包脚本 (GUI 版本)
+      - name: Build executable with PyInstaller
+        run: pyinstaller --onefile --windowed --name sms_verifier_gui kop.py # 使用 --windowed
 
-    # 第五步：上传构建产物 (Artifact)
-    # 将 dist 目录下生成的 exe 文件上传，方便下载
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: sms-verifier-windows-exe # Artifact 的名字
-        path: dist/sms_verifier.exe     # 指定要上传的文件路径 (PyInstaller 默认输出到 dist 目录)
+      # 第五步：上传构建产物 (Artifact)
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sms-verifier-gui-windows-exe # Artifact 的名字
+          path: dist/sms_verifier_gui.exe     # 指定要上传的文件路径
+
