@@ -14,10 +14,10 @@ import winsound # 用于播放声音 (Windows only)
 import base64 # 用于简单的缓存混淆
 
 # --- MySQL Database Configuration ---
-MYSQL_HOST = "your_mysql_host"
-MYSQL_USER = "your_mysql_username"
-MYSQL_PASSWORD = "your_mysql_password"
-MYSQL_DATABASE = "your_database_name"
+MYSQL_HOST = "152.136.171.223"
+MYSQL_USER = "wxxmg888"
+MYSQL_PASSWORD = "xmg888.top"
+MYSQL_DATABASE = "wxxmg888"
 
 # --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
