@@ -41,14 +41,12 @@ jobs:
     # --windowed: 用于 GUI 应用，运行时不显示黑色命令行窗口
     # --name "无尽冬日接码工具": (修改!) 指定生成的 .exe 文件名 (注意带空格和中文需要引号)
     # kop.py: (修改!) 你的 Python 脚本文件名
-    - name: Build executable with PyInstaller
-      run: pyinstaller --onefile --windowed --name "无尽冬日接码工具" kop.py
-
-    # 第五步：上传构建产物 (Artifact)
-    - name: Upload artifact
-      uses: actions/upload-artifact@v4
-      with:
-        # Artifact 的名称 (修改!)
-        name: WujinDongri-JieMa-Tool-Windows-exe
-        # 要上传的文件路径 (修改!) - 必须与上面 --name 参数生成的 .exe 文件名匹配
-        path: dist/无尽冬日接码工具.exe
+    # ...
+    - name: Build executable with PyInstaller (Debug Console)
+      run: pyinstaller --onefile --console --name "无尽冬日接码工具_debug" kop.py # 改为 --console
+  # ...
+  - name: Upload artifact (Debug Console)
+    uses: actions/upload-artifact@v4
+    with:
+      name: WujinDongri-JieMa-Tool-Debug-exe # 修改 Artifact 名称
+      path: dist/无尽冬日接码工具_debug.exe # 修改路径
