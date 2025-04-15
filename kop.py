@@ -69,120 +69,102 @@ def test_database_connection():
 class SmsApp:
     def __init__(self, root):
         """初始化应用程序窗口和变量"""
-        print("DEBUG: Entering SmsApp.__init__...") # 添加调试打印
+        print("DEBUG: Entering SmsApp.__init__...")
         self.root = root
-        self.root.title("无尽冬日接码工具 - 未登录") # 初始标题
+        self.root.title("无尽冬日接码工具 - 未登录")
         self.root.geometry("600x480")
-        print("DEBUG: SmsApp - Withdrawing root window...") # 添加调试打印
-        self.root.withdraw() # 初始隐藏主窗口
+        # print("DEBUG: SmsApp - Withdrawing root window...") # --- 移除 withdraw ---
+        # self.root.withdraw() # 不再初始隐藏主窗口
 
-        # 实例变量
-        self.token = None           # API 访问令牌
-        self.phone_number = None    # 当前获取到的手机号
-        self.server = None          # 当前使用的 API 服务器地址
-        self.is_working = False     # 标记是否有后台任务正在运行
-        self.auto_fetch_job = None  # 用于存储 Tkinter 的 after 任务 ID，以便取消
-        # 用户相关状态
+        # ... (实例变量初始化) ...
+        self.token = None
+        self.phone_number = None
+        self.server = None
+        self.is_working = False
+        self.auto_fetch_job = None
         self.logged_in_user_id = None
         self.logged_in_username = None
         self.remaining_uses = 0
-        print("DEBUG: SmsApp - Variables initialized.") # 添加调试打印
+        print("DEBUG: SmsApp - Variables initialized.")
 
         # --- 创建主窗口 GUI 元素 ---
-        print("DEBUG: SmsApp - Calling _create_main_widgets...") # 添加调试打印
+        print("DEBUG: SmsApp - Calling _create_main_widgets...")
         self._create_main_widgets()
-        print("DEBUG: SmsApp - _create_main_widgets finished.") # 添加调试打印
+        print("DEBUG: SmsApp - _create_main_widgets finished.")
 
-        # --- 显示登录窗口 ---
-        print("DEBUG: SmsApp - Calling show_login_window...") # 添加调试打印
-        self.show_login_window()
-        print("DEBUG: SmsApp - show_login_window finished.") # 添加调试打印
-        print("DEBUG: Exiting SmsApp.__init__.") # 添加调试打印
+        # --- 安排显示登录窗口 (使用 after) ---
+        print("DEBUG: SmsApp - Scheduling show_login_window...")
+        self.root.after(10, self.show_login_window) # 稍微延迟后显示登录窗口
+        print("DEBUG: Exiting SmsApp.__init__.")
 
+    # ... (_create_main_widgets 保持不变) ...
     def _create_main_widgets(self):
-        """创建主应用程序窗口的控件"""
-        print("DEBUG: Entering _create_main_widgets...") # 添加调试打印
-        # 主控制框架
+        print("DEBUG: Entering _create_main_widgets...")
         control_frame = ttk.Frame(self.root, padding="10")
         control_frame.pack(pady=10, padx=10, fill=tk.X)
         control_frame.columnconfigure(1, weight=1)
-
-        # 剩余次数显示
         ttk.Label(control_frame, text="剩余次数:").grid(row=0, column=0, padx=5, pady=5, sticky=tk.W)
-        self.uses_var = tk.StringVar(value="--") # 初始值
+        self.uses_var = tk.StringVar(value="--")
         self.uses_label = ttk.Label(control_frame, textvariable=self.uses_var, width=15, anchor=tk.W)
         self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
-
-        # 用户名显示
         ttk.Label(control_frame, text="当前用户:").grid(row=0, column=2, padx=5, pady=5, sticky=tk.E)
         self.username_var = tk.StringVar(value="未登录")
         self.username_label = ttk.Label(control_frame, textvariable=self.username_var, anchor=tk.E)
         self.username_label.grid(row=0, column=3, padx=5, pady=5, sticky=tk.E)
-
-        # 手机号码显示
         ttk.Label(control_frame, text="手机号码:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
         self.phone_var = tk.StringVar(value="尚未获取")
         self.phone_entry = ttk.Entry(control_frame, textvariable=self.phone_var, state='readonly', width=20)
         self.phone_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
-
-        # 验证码显示
         ttk.Label(control_frame, text="验证码:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
         self.code_var = tk.StringVar(value="尚未获取")
         self.code_entry = ttk.Entry(control_frame, textvariable=self.code_var, state='readonly', width=20)
         self.code_entry.grid(row=2, column=1, padx=5, pady=5, sticky=tk.W)
-
-        # 功能按钮 (初始禁用)
         self.get_phone_btn = ttk.Button(control_frame, text="获取手机号", command=self.start_get_phone_thread, width=15, state=tk.DISABLED)
         self.get_phone_btn.grid(row=1, column=2, padx=(10,5), pady=5, sticky=tk.E)
-
         self.copy_phone_btn = ttk.Button(control_frame, text="复制手机号码", command=self.copy_phone, width=15, state=tk.DISABLED)
         self.copy_phone_btn.grid(row=1, column=3, padx=5, pady=5, sticky=tk.E)
-
         self.copy_code_btn = ttk.Button(control_frame, text="复制验证码", command=self.copy_code, width=15, state=tk.DISABLED)
         self.copy_code_btn.grid(row=2, column=3, padx=5, pady=5, sticky=tk.E)
-
         self.blacklist_btn = ttk.Button(control_frame, text="拉黑手机号码", command=self.start_blacklist_thread, width=15, state=tk.DISABLED)
         self.blacklist_btn.grid(row=3, column=3, padx=5, pady=10, sticky=tk.E)
-
-        # 日志输出区域
         log_frame = ttk.LabelFrame(self.root, text="日志输出", padding="10")
         log_frame.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
         self.log_text = scrolledtext.ScrolledText(log_frame, wrap=tk.WORD, height=10, state=tk.DISABLED)
         self.log_text.pack(fill=tk.BOTH, expand=True)
-
-        # 状态栏
         self.status_var = tk.StringVar(value="请先登录.")
         status_bar = ttk.Label(self.root, textvariable=self.status_var, relief=tk.SUNKEN, anchor=tk.W)
         status_bar.pack(side=tk.BOTTOM, fill=tk.X)
-        print("DEBUG: Exiting _create_main_widgets.") # 添加调试打印
+        print("DEBUG: Exiting _create_main_widgets.")
 
-    def show_login_window(self): # 修改方法名
-        """显示登录窗口"""
-        print("DEBUG: Entering show_login_window...") # 添加调试打印
-        LoginWindow(self.root, self) # 调用 LoginWindow
-        print("DEBUG: Exiting show_login_window.") # 添加调试打印
+
+    def show_login_window(self):
+        print("DEBUG: Entering show_login_window...")
+        # 检查是否已有登录窗口实例，防止重复创建 (虽然理论上不会)
+        # if not hasattr(self, 'login_window_instance') or not self.login_window_instance.winfo_exists():
+        self.login_window_instance = LoginWindow(self.root, self)
+        print("DEBUG: Exiting show_login_window.")
 
     def on_login_success(self, user_id, username, remaining_uses):
-        """登录成功后的回调函数"""
-        print("DEBUG: Entering on_login_success...") # 添加调试打印
+        print("DEBUG: Entering on_login_success...")
         self.logged_in_user_id = user_id
         self.logged_in_username = username
         self.remaining_uses = remaining_uses
 
-        print("DEBUG: Deiconifying root window...") # 添加调试打印
-        self.root.deiconify() # 显示主窗口
-        self.root.title(f"无尽冬日接码工具 - 用户: {username}") # 更新标题
+        # print("DEBUG: Deiconifying root window...") # 不再需要 deiconify
+        # self.root.deiconify() # 主窗口一开始就是可见的
+        self.root.title(f"无尽冬日接码工具 - 用户: {username}")
         self.username_var.set(username)
         self.uses_var.set(str(remaining_uses))
         self.status_var.set("登录成功，正在初始化...")
         self.log_message(f"用户 {username} 登录成功，剩余次数: {remaining_uses}")
 
-        print("DEBUG: Calling start_initial_login_thread...") # 添加调试打印
+        print("DEBUG: Calling start_initial_login_thread...")
         self.start_initial_login_thread()
-        print("DEBUG: Calling update_ui_state(False)...") # 添加调试打印
-        self.update_ui_state(False) # 初始为非工作状态
-        print("DEBUG: Exiting on_login_success.") # 添加调试打印
+        print("DEBUG: Calling update_ui_state(False)...")
+        self.update_ui_state(False)
+        print("DEBUG: Exiting on_login_success.")
 
+    # ... (SmsApp 的其他方法保持不变) ...
     # --- 日志记录与状态更新方法 ---
     def log_message(self, message):
         if self.root: self.root.after(0, self._append_log, message)
@@ -573,18 +555,19 @@ class LoginWindow(Toplevel):
         ttk.Button(button_frame, text="退出", command=self._on_closing).pack(side=tk.LEFT, padx=10)
 
         self.username_entry.focus_set()
-        self.update_idletasks()
+        # 移除窗口定位代码，使用默认位置
+        # self.update_idletasks()
         # parent_x = parent.winfo_rootx(); parent_y = parent.winfo_rooty()
         # parent_width = parent.winfo_width(); parent_height = parent.winfo_height()
         # self_width = self.winfo_width(); self_height = self.winfo_height()
         # x = parent_x + (parent_width // 2) - (self_width // 2)
         # y = parent_y + (parent_height // 2) - (self_height // 2)
         # self.geometry(f"+{x}+{y}")
-        # 在 LoginWindow 的 __init__ 方法末尾
 
-        self.lift() # 将窗口提升到顶层
-        self.focus_force() # 强制设置焦点
-        print("DEBUG: Exiting LoginWindow.__init__.")
+        # 强制置顶和焦点
+        self.lift()
+        self.focus_force()
+        print("DEBUG: Exiting LoginWindow.__init__.") # 添加调试打印
 
     def _login(self):
         """处理登录逻辑"""
@@ -631,12 +614,14 @@ if __name__ == "__main__":
         sys.exit(1) # 连接失败则退出
     print("DEBUG: Database connection successful.") # 添加调试打印
 
-    # 2. 创建 Tkinter 主窗口 (初始隐藏)
+    # 2. 创建 Tkinter 主窗口
     print("DEBUG: Creating Tk root window...") # 添加调试打印
     root = tk.Tk()
+    # --- 修改：不在 SmsApp 中隐藏 root ---
+    # root.withdraw() # 移除这行
     print("DEBUG: Tk root window created.") # 添加调试打印
 
-    # 3. 实例化应用程序类 (这会触发登录窗口)
+    # 3. 实例化应用程序类
     print("DEBUG: Instantiating SmsApp...") # 添加调试打印
     app = SmsApp(root)
     print("DEBUG: SmsApp instantiated.") # 添加调试打印
