@@ -574,13 +574,17 @@ class LoginWindow(Toplevel):
 
         self.username_entry.focus_set()
         self.update_idletasks()
-        parent_x = parent.winfo_rootx(); parent_y = parent.winfo_rooty()
-        parent_width = parent.winfo_width(); parent_height = parent.winfo_height()
-        self_width = self.winfo_width(); self_height = self.winfo_height()
-        x = parent_x + (parent_width // 2) - (self_width // 2)
-        y = parent_y + (parent_height // 2) - (self_height // 2)
-        self.geometry(f"+{x}+{y}")
-        print("DEBUG: Exiting LoginWindow.__init__.") # 添加调试打印
+        # parent_x = parent.winfo_rootx(); parent_y = parent.winfo_rooty()
+        # parent_width = parent.winfo_width(); parent_height = parent.winfo_height()
+        # self_width = self.winfo_width(); self_height = self.winfo_height()
+        # x = parent_x + (parent_width // 2) - (self_width // 2)
+        # y = parent_y + (parent_height // 2) - (self_height // 2)
+        # self.geometry(f"+{x}+{y}")
+        # 在 LoginWindow 的 __init__ 方法末尾
+
+        self.lift() # 将窗口提升到顶层
+        self.focus_force() # 强制设置焦点
+        print("DEBUG: Exiting LoginWindow.__init__.")
 
     def _login(self):
         """处理登录逻辑"""
