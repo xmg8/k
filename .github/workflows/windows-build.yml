@@ -1,48 +1,54 @@
-name: Build Python Executable for Windows
+# 工作流程名称
+name: Build 无尽冬日接码工具 for Windows
 
-# 触发条件：当有代码推送到 main 分支时触发
+# 触发条件：
+# 1. 当有代码推送到 'main' 分支时触发
+# 2. 允许手动从 GitHub Actions 页面触发 (workflow_dispatch)
 on:
   push:
-    branches: [ "main" ] # 你可以改成你的主分支名，比如 master
-  # 或者，你也可以设置为当创建 Release 时触发：
-  # release:
-  #   types: [created]
+    branches: [ "main" ] # 你可以修改为你的主分支名，例如 "master"
+  workflow_dispatch: # 允许手动触发
 
+# 定义一个或多个作业 (jobs)
 jobs:
+  # 作业 ID
   build:
-    # 指定运行环境为最新的 Windows 系统
-    runs-on: windows-latest
+    # 指定运行此作业的虚拟机环境
+    runs-on: windows-latest # 必须是 Windows 环境才能打包 .exe
 
+    # 作业包含的一系列步骤 (steps)
     steps:
     # 第一步：签出（Checkout）代码
-    # 这个 Action 会把你的仓库代码下载到 Runner 环境中
     - name: Checkout repository
-      uses: actions/checkout@v4 # 使用官方的 checkout action
+      uses: actions/checkout@v4
 
     # 第二步：设置 Python 环境
-    # 指定要使用的 Python 版本
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10' # 你可以指定你需要的 Python 版本
+        python-version: '3.10' # 确保这个版本与你的开发环境兼容
 
     # 第三步：安装依赖项
-    # 安装 requirements.txt 中列出的所有库，以及 PyInstaller
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        # 确保你的仓库根目录下有一个 requirements.txt 文件
+        if (Test-Path requirements.txt) { pip install -r requirements.txt } else { Write-Host "requirements.txt not found, skipping." }
         pip install pyinstaller
-      # ... (previous steps) ...
 
-      # 第四步：使用 PyInstaller 打包脚本 (GUI 版本)
-      - name: Build executable with PyInstaller
-        run: pyinstaller --onefile --windowed --name sms_verifier_gui kop.py # 使用 --windowed
+    # 第四步：使用 PyInstaller 打包脚本
+    # --onefile: 打包成单个 .exe 文件
+    # --windowed: 用于 GUI 应用，运行时不显示黑色命令行窗口
+    # --name "无尽冬日接码工具": (修改!) 指定生成的 .exe 文件名 (注意带空格和中文需要引号)
+    # kop.py: (修改!) 你的 Python 脚本文件名
+    - name: Build executable with PyInstaller
+      run: pyinstaller --onefile --windowed --name "无尽冬日接码工具" kop.py
 
-      # 第五步：上传构建产物 (Artifact)
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: sms-verifier-gui-windows-exe # Artifact 的名字
-          path: dist/sms_verifier_gui.exe     # 指定要上传的文件路径
-
+    # 第五步：上传构建产物 (Artifact)
+    - name: Upload artifact
+      uses: actions/upload-artifact@v4
+      with:
+        # Artifact 的名称 (修改!)
+        name: WujinDongri-JieMa-Tool-Windows-exe
+        # 要上传的文件路径 (修改!) - 必须与上面 --name 参数生成的 .exe 文件名匹配
+        path: dist/无尽冬日接码工具.exe
