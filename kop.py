@@ -2,11 +2,8 @@ import requests
 import time
 from urllib.parse import urlencode
 import os
-# import tkinter as tk # 移除
 import customtkinter # 导入 customtkinter
-# --- 导入必要的 tkinter 组件和常量 ---
-from tkinter import messagebox, StringVar, BooleanVar, W, E, LEFT, DISABLED, NORMAL, END, BOTH, X, Y, SUNKEN, WORD, NSEW, EW
-# --- 结束导入 ---
+from tkinter import messagebox, StringVar, BooleanVar, W, E, LEFT, DISABLED, NORMAL, END, BOTH, X, Y, SUNKEN, WORD, NSEW, EW # 导入需要的常量和变量类
 import threading
 import sys
 import ssl
@@ -16,11 +13,10 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import winsound # 用于播放声音 (Windows only)
 import base64 # 用于简单的缓存混淆
 
-# --- MySQL Database Configuration ---
-MYSQL_HOST = "152.136.171.223"
-MYSQL_USER = "wxxmg888"
-MYSQL_PASSWORD = "xmg888.top"
-MYSQL_DATABASE = "wxxmg888"
+MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
+MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
+MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
+MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
 
 # --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
@@ -50,6 +46,23 @@ GENERIC_ERROR_MSG = "发生错误，请联系管理员。"
 ADMIN_CONTACT_MSG = "，请联系管理员。"
 DB_RETRY_COUNT = 10
 DB_RETRY_DELAY = 2
+ADMIN_CONTACT_INFO = "如需账号或充值，请联系管理员 QQ/微信: 954158026" # 管理员联系方式
+ANNOUNCEMENT_TEXT = """
+【使用说明】
+1. 登录后，点击“获取手机号”按钮，有时获取手机号码需要一些时间，请耐心等待。
+2. 程序会自动获取一个临时手机号码显示在上方。
+3. 将此号码用于无尽冬日游戏注册获取验证码，其他项目可联系管理员添加。
+4. 程序将在获取号码10秒后自动开始接收验证码。
+5. 成功接收到验证码后会显示在上方，可以点击复制验证码后直接使用。
+6. 如果长时间未收到验证码，程序会自动将该号码拉黑并重新获取新号码。
+7. 你也可以手动点击“拉黑号码”放弃当前号码。
+8. 复制按钮可方便复制号码和验证码。
+9. 声音提示可在左下角勾选开启或关闭。
+
+【注意事项】
+- 请勿将获取的号码用于非法用途。
+- 如遇任何问题或次数用尽，请联系管理员。
+"""
 
 # --- 数据库连接测试 ---
 def test_database_connection():
@@ -69,82 +82,98 @@ def test_database_connection():
     return False
 
 # --- GUI 应用主类 ---
-class SmsApp(customtkinter.CTk): # 继承 CTk
-    def __init__(self): # root 参数不再需要传入
-        """初始化应用程序窗口和变量"""
-        super().__init__() # 调用父类初始化
+class SmsApp(customtkinter.CTk):
+    def __init__(self):
+        super().__init__()
+        self.title("无尽冬日接码工具 - 未登录")
+        self.geometry("700x650") # 增加窗口高度
 
-        self.title("无尽冬日接码工具 - 未登录") # 你修改后的标题
-        self.geometry("650x550") # 可以适当调整大小
-
-        # --- 设置外观 ---
         customtkinter.set_appearance_mode("System")
         customtkinter.set_default_color_theme("blue")
 
-        # 实例变量
         self.token = None; self.phone_number = None; self.server = None
         self.is_working = False; self.auto_fetch_job = None
         self.logged_in_user_id = None; self.logged_in_username = None; self.remaining_uses = 0
 
         self._create_main_widgets()
-        self.protocol("WM_DELETE_WINDOW", self._on_app_closing) # 绑定关闭事件
-        self.withdraw() # 初始隐藏主窗口
-        self.after(100, self.show_login_window) # 稍微延迟显示登录窗口
+        self.protocol("WM_DELETE_WINDOW", self._on_app_closing)
+        self.withdraw()
+        self.after(100, self.show_login_window)
 
     def _create_main_widgets(self):
-        """创建主应用程序窗口的控件"""
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        # --- 调整行权重 ---
+        self.grid_rowconfigure(1, weight=1) # 公告区域可扩展
+        self.grid_rowconfigure(2, weight=1) # 日志区域可扩展
+        # --- 结束调整 ---
 
         control_frame = customtkinter.CTkFrame(self, corner_radius=10)
         control_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky=NSEW)
         control_frame.grid_columnconfigure(1, weight=1)
         control_frame.grid_columnconfigure(3, weight=0)
 
-        customtkinter.CTkLabel(control_frame, text="剩余次数:", anchor="w").grid(row=0, column=0, padx=10, pady=5, sticky=W)
-        self.uses_var = StringVar(value="--") # 使用导入的 StringVar
-        self.uses_label = customtkinter.CTkLabel(control_frame, textvariable=self.uses_var, width=100, anchor="w")
-        self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=W)
-        customtkinter.CTkLabel(control_frame, text="当前用户:", anchor="e").grid(row=0, column=2, padx=10, pady=5, sticky=E)
-        self.username_var = StringVar(value="未登录") # 使用导入的 StringVar
-        self.username_label = customtkinter.CTkLabel(control_frame, textvariable=self.username_var, anchor="e")
-        self.username_label.grid(row=0, column=3, padx=5, pady=5, sticky=E)
-        customtkinter.CTkLabel(control_frame, text="手机号码:", anchor="w").grid(row=1, column=0, padx=10, pady=5, sticky=W)
-        self.phone_var = StringVar(value="尚未获取") # 使用导入的 StringVar
-        self.phone_entry = customtkinter.CTkEntry(control_frame, textvariable=self.phone_var, state='disabled', width=150)
-        self.phone_entry.grid(row=1, column=1, padx=5, pady=5, sticky=EW)
-        customtkinter.CTkLabel(control_frame, text="验证码:", anchor="w").grid(row=2, column=0, padx=10, pady=5, sticky=W)
-        self.code_var = StringVar(value="尚未获取") # 使用导入的 StringVar
-        self.code_entry = customtkinter.CTkEntry(control_frame, textvariable=self.code_var, state='disabled', width=150)
-        self.code_entry.grid(row=2, column=1, padx=5, pady=5, sticky=EW)
+        # ... (剩余次数、当前用户、手机号、验证码标签和输入框保持不变) ...
+        ttk.Label(control_frame, text="剩余次数:").grid(row=0, column=0, padx=10, pady=5, sticky=tk.W)
+        self.uses_var = tk.StringVar(value="--"); self.uses_label = ttk.Label(control_frame, textvariable=self.uses_var, width=15, anchor=tk.W)
+        self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=tk.W)
+        ttk.Label(control_frame, text="当前用户:").grid(row=0, column=2, padx=5, pady=5, sticky=tk.E)
+        self.username_var = tk.StringVar(value="未登录"); self.username_label = ttk.Label(control_frame, textvariable=self.username_var, anchor=tk.E)
+        self.username_label.grid(row=0, column=3, padx=5, pady=5, sticky=tk.E)
+        ttk.Label(control_frame, text="手机号码:").grid(row=1, column=0, padx=5, pady=5, sticky=tk.W)
+        self.phone_var = tk.StringVar(value="尚未获取"); self.phone_entry = ttk.Entry(control_frame, textvariable=self.phone_var, state='readonly', width=20)
+        self.phone_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
+        ttk.Label(control_frame, text="验证码:").grid(row=2, column=0, padx=5, pady=5, sticky=tk.W)
+        self.code_var = tk.StringVar(value="尚未获取"); self.code_entry = ttk.Entry(control_frame, textvariable=self.code_var, state='readonly', width=20)
+        self.code_entry.grid(row=2, column=1, padx=5, pady=5, sticky=tk.W)
+        self.get_phone_btn = ttk.Button(control_frame, text="获取手机号", command=self.start_get_phone_thread, width=15, state=tk.DISABLED)
+        self.get_phone_btn.grid(row=1, column=2, padx=(10,5), pady=5, sticky=tk.E)
+        self.copy_phone_btn = ttk.Button(control_frame, text="复制手机号码", command=self.copy_phone, width=15, state=tk.DISABLED)
+        self.copy_phone_btn.grid(row=1, column=3, padx=5, pady=5, sticky=tk.E)
+        self.copy_code_btn = ttk.Button(control_frame, text="复制验证码", command=self.copy_code, width=15, state=tk.DISABLED)
+        self.copy_code_btn.grid(row=2, column=3, padx=5, pady=5, sticky=tk.E)
+        self.blacklist_btn = ttk.Button(control_frame, text="拉黑手机号码", command=self.start_blacklist_thread, width=15, state=tk.DISABLED)
+        self.blacklist_btn.grid(row=3, column=3, padx=5, pady=10, sticky=tk.E)
+        self.sound_enabled_var = tk.BooleanVar(value=True)
+        sound_check = ttk.Checkbutton(control_frame, text="声音提示", variable=self.sound_enabled_var)
+        sound_check.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky=tk.W)
 
-        button_width = 130
-        self.get_phone_btn = customtkinter.CTkButton(control_frame, text="获取手机号", command=self.start_get_phone_thread, width=button_width, state=DISABLED) # 使用导入的 DISABLED
-        self.get_phone_btn.grid(row=1, column=2, padx=(20, 5), pady=5)
-        self.copy_phone_btn = customtkinter.CTkButton(control_frame, text="复制号码", command=self.copy_phone, width=button_width, state=DISABLED)
-        self.copy_phone_btn.grid(row=1, column=3, padx=5, pady=5)
-        self.copy_code_btn = customtkinter.CTkButton(control_frame, text="复制验证码", command=self.copy_code, width=button_width, state=DISABLED)
-        self.copy_code_btn.grid(row=2, column=3, padx=5, pady=5)
-        self.blacklist_btn = customtkinter.CTkButton(control_frame, text="拉黑号码", command=self.start_blacklist_thread, width=button_width, state=DISABLED, fg_color="firebrick", hover_color="darkred")
-        self.blacklist_btn.grid(row=3, column=3, padx=5, pady=10)
+        # --- 公告区域 ---
+        announcement_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        announcement_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky=NSEW)
+        announcement_frame.grid_rowconfigure(1, weight=1)
+        announcement_frame.grid_columnconfigure(0, weight=1)
 
-        self.sound_enabled_var = BooleanVar(value=True) # 使用导入的 BooleanVar
-        sound_check = customtkinter.CTkCheckBox(control_frame, text="声音提示", variable=self.sound_enabled_var)
-        sound_check.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky=W)
+        customtkinter.CTkLabel(announcement_frame, text="公告与说明:", font=customtkinter.CTkFont(weight="bold")).grid(row=0, column=0, padx=0, pady=(0,5), sticky="w")
+        self.announcement_text = customtkinter.CTkTextbox(announcement_frame, wrap=WORD, state=DISABLED, corner_radius=8, height=150) # 设置初始高度
+        self.announcement_text.grid(row=1, column=0, sticky=NSEW)
+        # 插入公告内容
+        self.announcement_text.configure(state=NORMAL)
+        self.announcement_text.insert(END, ANNOUNCEMENT_TEXT.strip())
+        self.announcement_text.configure(state=DISABLED)
+        # --- 结束公告区域 ---
 
-        # 日志区域直接放在主窗口上
-        self.log_text = customtkinter.CTkTextbox(self, wrap=WORD, state=DISABLED, corner_radius=8)
-        self.log_text.grid(row=1, column=0, padx=20, pady=(0,10), sticky=NSEW)
+        # --- 日志输出区域 ---
+        log_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        log_frame.grid(row=2, column=0, padx=20, pady=(0, 10), sticky=NSEW) # 调整到第 2 行
+        log_frame.grid_rowconfigure(1, weight=1)
+        log_frame.grid_columnconfigure(0, weight=1)
 
-        self.status_var = StringVar(value="请先登录.") # 使用导入的 StringVar
+        customtkinter.CTkLabel(log_frame, text="运行日志:", font=customtkinter.CTkFont(weight="bold")).grid(row=0, column=0, padx=0, pady=(0,5), sticky="w")
+        self.log_text = customtkinter.CTkTextbox(log_frame, wrap=WORD, state=DISABLED, corner_radius=8)
+        self.log_text.grid(row=1, column=0, sticky=NSEW)
+        # --- 结束日志区域 ---
+
+        self.status_var = StringVar(value="请先登录.")
         status_bar = customtkinter.CTkLabel(self, textvariable=self.status_var, height=25, anchor="w", padx=10)
-        status_bar.grid(row=2, column=0, sticky=EW)
+        status_bar.grid(row=3, column=0, sticky=EW) # 调整到第 3 行
 
+    # ... (其他 SmsApp 方法保持不变, 包括 on_login_success, 日志, 状态, UI 更新, 后台任务, 数据库, 缓存, API, GUI 辅助方法) ...
+    # ... (请确保粘贴完整的 SmsApp 类代码) ...
     def show_login_window(self):
         if hasattr(self, 'login_window_instance') and self.login_window_instance and self.login_window_instance.winfo_exists():
             self.login_window_instance.focus_force()
         else:
-            self.login_window_instance = LoginWindow(self, self)
+            self.login_window_instance = LoginWindow(self, self) # Toplevel 的父级是主 App 实例
 
     def on_login_success(self, user_id, username, remaining_uses):
         # --- 保持你修改后的日志逻辑 ---
@@ -188,8 +217,9 @@ class SmsApp(customtkinter.CTk): # 继承 CTk
             copy_phone_state = DISABLED if not phone_available else NORMAL
             copy_code_state = DISABLED if not is_logged_in or working or not code_available else NORMAL
             self.blacklist_btn.configure(state=blacklist_state); self.copy_phone_btn.configure(state=copy_phone_state); self.copy_code_btn.configure(state=copy_code_state)
-            self.phone_entry.configure(state=NORMAL if phone_available else DISABLED)
+            self.phone_entry.configure(state=NORMAL if phone_available else DISABLED) # 用 NORMAL/DISABLED
             self.code_entry.configure(state=NORMAL if code_available else DISABLED)
+
             if not is_logged_in: self.set_status("请先登录.")
             else:
                 current_status = self.status_var.get()
@@ -460,21 +490,29 @@ class SmsApp(customtkinter.CTk): # 继承 CTk
         self.destroy()
 
 
-# --- 登录窗口类 (使用 customtkinter) ---
+# --- 登录窗口类 (添加联系方式) ---
 class LoginWindow(customtkinter.CTkToplevel):
     def __init__(self, parent, app_instance):
         super().__init__(parent)
         self.parent = parent; self.app = app_instance
-        self.title("用户登录"); self.geometry("320x200"); self.resizable(False, False)
+        self.title("用户登录"); self.geometry("320x230"); self.resizable(False, False) # 增加高度
         self.protocol("WM_DELETE_WINDOW", self._on_closing); self.grab_set(); self.transient(parent)
         self.grid_columnconfigure(1, weight=1)
+
         customtkinter.CTkLabel(self, text="用户名:").grid(row=0, column=0, padx=(20, 5), pady=10, sticky="w")
         self.username_entry = customtkinter.CTkEntry(self, width=180); self.username_entry.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="ew")
         customtkinter.CTkLabel(self, text="密  码:").grid(row=1, column=0, padx=(20, 5), pady=10, sticky="w")
         self.password_entry = customtkinter.CTkEntry(self, show="*", width=180); self.password_entry.grid(row=1, column=1, padx=(0, 20), pady=10, sticky="ew")
-        button_frame = customtkinter.CTkFrame(self, fg_color="transparent"); button_frame.grid(row=2, column=0, columnspan=2, pady=20)
+
+        button_frame = customtkinter.CTkFrame(self, fg_color="transparent"); button_frame.grid(row=2, column=0, columnspan=2, pady=15)
         customtkinter.CTkButton(button_frame, text="登录", command=self._login).pack(side=LEFT, padx=10)
         customtkinter.CTkButton(button_frame, text="退出", command=self._on_closing, fg_color="gray", hover_color="dimgray").pack(side=LEFT, padx=10)
+
+        # --- 添加管理员联系方式 ---
+        contact_label = customtkinter.CTkLabel(self, text=ADMIN_CONTACT_INFO, text_color="gray", font=customtkinter.CTkFont(size=10))
+        contact_label.grid(row=3, column=0, columnspan=2, padx=20, pady=(10, 5), sticky="ew")
+        # --- 结束添加 ---
+
         self.username_entry.focus_set(); self.lift(); self.focus_force()
         try: # 尝试居中
             self.update_idletasks()
