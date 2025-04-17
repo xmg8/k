@@ -47,18 +47,18 @@ ADMIN_CONTACT_NUMBER = "954158026"
 ADMIN_CONTACT_INFO_LINE1 = "如需账号或充值，请联系管理员"
 ADMIN_CONTACT_INFO_LINE2 = f"QQ/微信: {ADMIN_CONTACT_NUMBER}"
 ANNOUNCEMENT_TEXT = """
-【注意事项】
+                           【注意事项】
 -重要提示！！！【号码不保证全新，成功收到验证码即刻扣费，如不能接受请停止使用！！！】
 【可先少量测试，确定可以满足要求后再使用】
 - 严禁将获取的号码用于非法用途！
 - 如遇问题或次数用尽，请联系管理员。
-============================================================================
-【使用说明】
+=====================================================================================
+                           【使用说明】
 1. 点击“获取手机号”按钮，程序会自动获取临时号码并显示，【点击复制号码可自动复制】。
 2. 将此号码用于需要接收验证码的项目，账号对应项目请查看软件顶部显示。
 3. 成功接收到验证码就会扣费，无论是否可用！【点击复制验证码可自动复制】。
 4. 长时间未收到验证码，会自动拉黑并获取新号。
-5.  可手动点击“拉黑号码”放弃当前号码，为收到验证码不扣费。
+5. 成功使用验证码后，点击“获取手机号”按钮，开始再次使用。
 """
 KEYRING_SERVICE_NAME = "WujinDongriJieMaTool"
 SUCCESS_SOUND_ALIAS = "SystemQuestion"
@@ -307,7 +307,7 @@ class SmsApp(customtkinter.CTk):
         if not self.logged_in_user_id or not self.current_project_id: return
         self.is_working = True; self.set_status("正在获取验证码..."); self.code_var.set("正在获取...")
         self.update_ui_state(True)
-        self.log_message(f"开始为 {self.phone_number} ( 获取验证码...")
+        self.log_message(f"开始为 {self.phone_number} ( 获取验证码）")
         thread = threading.Thread(target=self._get_code_task_automatic, daemon=True); thread.start()
     def start_blacklist_thread(self):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
