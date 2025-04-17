@@ -15,11 +15,10 @@ import base64
 import keyring # 导入 keyring
 import keyring.errors # 导入 keyring 错误类型
 
-# --- MySQL Database Configuration ---
-MYSQL_HOST = "your_mysql_host"
-MYSQL_USER = "your_mysql_username"
-MYSQL_PASSWORD = "your_mysql_password"
-MYSQL_DATABASE = "your_database_name"
+MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
+MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
+MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
+MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
 
 # --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
