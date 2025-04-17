@@ -1,6 +1,7 @@
 requests==2.31.0
 pyinstaller==6.0.0
 Werkzeug==3.0.1
-mysql-connector-python==8.2.0 # <--- 修改这里！使用可用的 8.x 版本
+mysql-connector-python==8.2.0 # 或 2.2.9
 customtkinter>=5.0.0
 keyring>=23.0.0
+pyperclip>=1.8.0 # 添加 pyperclip
