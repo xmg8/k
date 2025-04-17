@@ -132,21 +132,73 @@ class SmsApp(customtkinter.CTk):
         sound_check = customtkinter.CTkCheckBox(control_frame, text="声音提示", variable=self.sound_enabled_var)
         sound_check.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky=W)
 
+        # --- 公告区域 (使用 ScrollableFrame 和多个 Label) ---
         announcement_outer_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         announcement_outer_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky=NSEW)
         announcement_outer_frame.grid_rowconfigure(1, weight=1); announcement_outer_frame.grid_columnconfigure(0, weight=1)
+
         customtkinter.CTkLabel(announcement_outer_frame, text="公告与说明:", font=customtkinter.CTkFont(weight="bold")).grid(row=0, column=0, padx=0, pady=(0,5), sticky="w")
+
         scrollable_frame = customtkinter.CTkScrollableFrame(announcement_outer_frame, corner_radius=8)
         scrollable_frame.grid(row=1, column=0, sticky=NSEW); scrollable_frame.grid_columnconfigure(0, weight=1)
-        announcement_label = customtkinter.CTkLabel(scrollable_frame, text=ANNOUNCEMENT_TEXT.strip(), justify=LEFT, anchor="nw")
-        announcement_label.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
 
+        # --- 拆分公告内容并设置样式 ---
+        current_row = 0 # 用于 grid 行计数
+
+        # 注意事项标题
+        notice_title = customtkinter.CTkLabel(scrollable_frame, text="【注意事项】",
+                                              font=customtkinter.CTkFont(size=18, weight="bold"), # 增大字体加粗
+                                              anchor="center") # 居中对齐
+        notice_title.grid(row=current_row, column=0, pady=(5, 2), sticky="ew")
+        current_row += 1
+
+        # 注意事项内容 (每条一个 Label)
+        notice_lines = [
+            "- 重要提示！！！【号码不保证全新，成功收到验证码即刻扣费，如不能接受请停止使用！！！】",
+            "【可先少量测试，确定可以满足要求后再使用】",
+            "- 严禁将获取的号码用于非法用途！",
+            "- 如遇问题或次数用尽，请联系管理员。"
+        ]
+        for line in notice_lines:
+            lbl = customtkinter.CTkLabel(scrollable_frame, text=line.strip(), justify=LEFT, anchor="w")
+            lbl.grid(row=current_row, column=0, padx=10, pady=(0, 2), sticky="w") # 左对齐
+            current_row += 1
+
+        # 分隔线
+        separator = customtkinter.CTkFrame(scrollable_frame, height=1, fg_color="gray50")
+        separator.grid(row=current_row, column=0, padx=10, pady=10, sticky="ew")
+        current_row += 1
+
+        # 使用说明标题
+        usage_title = customtkinter.CTkLabel(scrollable_frame, text="【使用说明】",
+                                             font=customtkinter.CTkFont(size=16, weight="bold"), # 增大字体加粗
+                                             anchor="center") # 居中对齐
+        usage_title.grid(row=current_row, column=0, pady=(5, 2), sticky="ew")
+        current_row += 1
+
+        # 使用说明内容 (每条一个 Label)
+        usage_lines = [
+            "1. 点击“获取手机号”按钮，程序会自动获取临时号码并显示，【点击复制号码可自动复制】。",
+            "2. 将此号码用于需要接收验证码的项目，账号对应项目请查看软件顶部显示。",
+            "3. 成功接收到验证码就会扣费，无论是否可用！【点击复制验证码可自动复制】。",
+            "4. 长时间未收到验证码，会自动拉黑并获取新号。",
+            "5. 成功使用验证码后，点击“获取手机号”按钮，开始再次使用。"
+        ]
+        for line in usage_lines:
+            lbl = customtkinter.CTkLabel(scrollable_frame, text=line.strip(), justify=LEFT, anchor="w")
+            lbl.grid(row=current_row, column=0, padx=10, pady=(0, 2), sticky="w") # 左对齐
+            current_row += 1
+        # --- 结束拆分 ---
+        # --- 结束公告区域 ---
+
+        # --- 日志输出区域 ---
         log_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         log_frame.grid(row=2, column=0, padx=20, pady=(0, 10), sticky=NSEW)
         log_frame.grid_rowconfigure(1, weight=1); log_frame.grid_columnconfigure(0, weight=1)
         customtkinter.CTkLabel(log_frame, text="运行日志:", font=customtkinter.CTkFont(weight="bold")).grid(row=0, column=0, padx=0, pady=(0,5), sticky="w")
         self.log_text = customtkinter.CTkTextbox(log_frame, wrap=WORD, state=DISABLED, corner_radius=8)
         self.log_text.grid(row=1, column=0, sticky=NSEW)
+        # --- 结束日志区域 ---
 
         self.status_var = StringVar(value="请先登录.")
         status_bar = customtkinter.CTkLabel(self, textvariable=self.status_var, height=25, anchor="w", padx=10)
@@ -314,7 +366,7 @@ class SmsApp(customtkinter.CTk):
         self.stop_code_fetching.set()
         # --- 结束设置 ---
         if messagebox.askyesno("确认", f"确定要拉黑号码 {self.phone_number} 吗？"):
-            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number} (项目ID: {self.current_project_id})")
+            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number}")
             thread = threading.Thread(target=self._blacklist_task, daemon=True); thread.start()
         else:
             self.stop_code_fetching.clear() # 用户取消，清除标志
@@ -526,7 +578,7 @@ class SmsApp(customtkinter.CTk):
             else:
                 if self.handle_api_error(data, "拉黑手机号"): return self.blacklist_phone()
                 self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("操作失败", "拉黑号码失败"+ADMIN_CONTACT_MSG)); return False
-        except requests.exceptions.RequestException: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("网络错误", "拉黑操作网络异常"+ADMIN_CONTACT_MSG)); return False
+        except requests.exceptions.RequestException: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("网络错误", "拉黑操作异常，请重试"+ADMIN_CONTACT_MSG)); return False
         except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); return False
 
     # --- GUI 辅助方法 ---
