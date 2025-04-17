@@ -632,6 +632,7 @@ class SmsApp(customtkinter.CTk):
 
 # --- 登录窗口类 ---
 class LoginWindow(customtkinter.CTkToplevel):
+    # ... (__init__, _center_window, _on_remember_change, _load_credentials 保持不变) ...
     def __init__(self, parent, app_instance):
         super().__init__(parent)
         self.parent = parent; self.app = app_instance
@@ -694,10 +695,12 @@ class LoginWindow(customtkinter.CTkToplevel):
                     if auto_login_flag == "true": self.autologin_var.set(True)
         except keyring.errors.KeyringError: pass
         except Exception: pass
+
     def _login(self):
         username = self.username_entry.get().strip(); password = self.password_entry.get()
         remember = self.remember_var.get(); auto_login = self.autologin_var.get()
         if not username or not password: messagebox.showwarning("输入错误", "用户名和密码不能为空。", parent=self); return
+
         conn = self.app._get_db_connection(); cursor = None
         if not conn: return
         try:
@@ -705,14 +708,27 @@ class LoginWindow(customtkinter.CTkToplevel):
             sql = "SELECT id, username, password_hash, remaining_uses, project_id, project_name FROM users WHERE username = %s"
             cursor.execute(sql, (username,))
             user_row = cursor.fetchone()
+
             if user_row and check_password_hash(user_row["password_hash"], password):
+                # --- 新增：检查剩余次数 ---
+                if user_row["remaining_uses"] <= 0:
+                    messagebox.showwarning("登录失败", "您的可用次数不足，请联系管理员充值。", parent=self)
+                    # 清除自动登录标志，因为用户需要手动处理
+                    if auto_login:
+                        try: keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
+                        except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
+                    return # 阻止登录
+                # --- 结束检查 ---
+
+                # 次数充足，继续登录流程
                 self.destroy()
                 self.app.on_login_success(
                     user_row["id"], user_row["username"], user_row["remaining_uses"],
                     user_row["project_id"], user_row["project_name"],
                     remember, password, auto_login
                 )
-            else: messagebox.showerror("登录失败", "用户名或密码错误。", parent=self)
+            else:
+                messagebox.showerror("登录失败", "用户名或密码错误。", parent=self)
         except MySQLError: messagebox.showerror("数据库错误", GENERIC_ERROR_MSG, parent=self)
         except Exception: messagebox.showerror("严重错误", GENERIC_ERROR_MSG, parent=self)
         finally:
