@@ -84,8 +84,8 @@ def test_database_connection():
 class SmsApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
-        self.default_title = "通用接码工具" # 定义默认标题
-        self.title(f"{self.default_title} - 未登录") # 使用默认标题初始化
+        self.default_title = "通用接码工具"
+        self.title(f"{self.default_title} - 未登录")
         self.geometry("700x700")
         customtkinter.set_appearance_mode("System")
         customtkinter.set_default_color_theme("blue")
@@ -93,8 +93,7 @@ class SmsApp(customtkinter.CTk):
         self.token = None; self.phone_number = None; self.server = None
         self.is_working = False; self.auto_fetch_job = None
         self.logged_in_user_id = None; self.logged_in_username = None; self.remaining_uses = 0
-        self.current_project_id = None # 新增：存储当前用户的项目ID
-        self.current_project_name = self.default_title # 新增：存储当前项目名称
+        self.current_project_id = None; self.current_project_name = self.default_title
 
         self._create_main_widgets()
         self.protocol("WM_DELETE_WINDOW", self._on_app_closing)
@@ -104,11 +103,17 @@ class SmsApp(customtkinter.CTk):
             self.after(100, self.show_login_window)
 
     def _create_main_widgets(self):
-        # ... (控件创建代码保持不变) ...
         self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1)
         control_frame = customtkinter.CTkFrame(self, corner_radius=10)
         control_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky=NSEW)
         control_frame.grid_columnconfigure(1, weight=1); control_frame.grid_columnconfigure(3, weight=0)
+
+        # --- 修改：增加注销按钮 ---
+        logout_btn = customtkinter.CTkButton(control_frame, text="注销/切换账号", command=self.logout, width=100, height=24, font=customtkinter.CTkFont(size=10), fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
+        logout_btn.grid(row=0, column=4, padx=(10, 20), pady=5, sticky="e") # 放在最右边
+        control_frame.grid_columnconfigure(4, weight=0) # 注销按钮列不扩展
+        # --- 结束修改 ---
+
         customtkinter.CTkLabel(control_frame, text="剩余次数:", anchor="w").grid(row=0, column=0, padx=10, pady=5, sticky=W)
         self.uses_var = StringVar(value="--"); self.uses_label = customtkinter.CTkLabel(control_frame, textvariable=self.uses_var, width=100, anchor="w")
         self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=W)
@@ -154,18 +159,15 @@ class SmsApp(customtkinter.CTk):
         status_bar = customtkinter.CTkLabel(self, textvariable=self.status_var, height=25, anchor="w", padx=10)
         status_bar.grid(row=3, column=0, sticky=EW)
 
-
     def show_login_window(self):
         if hasattr(self, 'login_window_instance') and self.login_window_instance and self.login_window_instance.winfo_exists():
             self.login_window_instance.focus_force()
         else:
             self.login_window_instance = LoginWindow(self, self)
 
-    def on_login_success(self, user_id, username, remaining_uses, project_id, project_name, remember=False, password=None, auto_login=False): # 添加 project_id, project_name
-        """登录成功后的回调函数"""
+    def on_login_success(self, user_id, username, remaining_uses, project_id, project_name, remember=False, password=None, auto_login=False):
         self.logged_in_user_id = user_id; self.logged_in_username = username;
-        self.current_project_id = project_id # 存储项目 ID
-        self.current_project_name = project_name or self.default_title # 存储项目名称，为空则用默认
+        self.current_project_id = project_id; self.current_project_name = project_name or self.default_title
 
         cached_uses = self._read_usage_cache()
         if cached_uses is not None and cached_uses <= remaining_uses: self.remaining_uses = cached_uses
@@ -186,7 +188,7 @@ class SmsApp(customtkinter.CTk):
                     keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
             except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
 
-        self.deiconify(); self.title(f"{self.current_project_name} - 用户: {username}") # 使用项目名称更新标题
+        self.deiconify(); self.title(f"{self.current_project_name} - 用户: {username}")
         self.username_var.set(username); self.uses_var.set(str(self.remaining_uses))
         self.status_var.set("登录成功，正在初始化 API...")
         self.log_message("登录成功。")
@@ -195,7 +197,6 @@ class SmsApp(customtkinter.CTk):
         self.lift(); self.focus_force()
 
     def attempt_auto_login(self):
-        """尝试使用存储的凭证进行自动登录"""
         try:
             auto_login_flag = keyring.get_password(KEYRING_SERVICE_NAME, "auto_login")
             if auto_login_flag != "true": return False
@@ -207,15 +208,21 @@ class SmsApp(customtkinter.CTk):
             if not conn: return False
             try:
                 cursor = conn.cursor(dictionary=True)
-                # --- 修改：查询时也获取 project_id 和 project_name ---
                 sql = "SELECT id, username, password_hash, remaining_uses, project_id, project_name FROM users WHERE username = %s"
                 cursor.execute(sql, (username,))
                 user_row = cursor.fetchone()
                 if user_row and check_password_hash(user_row["password_hash"], password):
-                    # --- 修改：传递 project_id 和 project_name ---
+                    # --- 修改：检查剩余次数 ---
+                    if user_row["remaining_uses"] <= 0:
+                        messagebox.showwarning("自动登录失败", "您的剩余次数不足，请联系管理员充值。")
+                        # 清理自动登录标志，但不清除密码，方便用户手动登录
+                        try: keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
+                        except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
+                        return False # 次数不足，阻止自动登录
+                    # --- 结束检查 ---
                     self.after(50, lambda: self.on_login_success(
                         user_row["id"], user_row["username"], user_row["remaining_uses"],
-                        user_row["project_id"], user_row["project_name"], # 传递新字段
+                        user_row["project_id"], user_row["project_name"],
                         remember=True, password=password, auto_login=True
                     ))
                     return True
@@ -253,7 +260,7 @@ class SmsApp(customtkinter.CTk):
              except AttributeError: pass
     def update_ui_state(self, working):
         self.is_working = working; is_logged_in = bool(self.logged_in_user_id)
-        can_get_phone = is_logged_in and not working and self.remaining_uses > 0 and self.current_project_id # 需要有项目ID才能获取
+        can_get_phone = is_logged_in and not working and self.remaining_uses > 0 and self.current_project_id
         get_phone_state = NORMAL if can_get_phone else DISABLED
         phone_available = bool(self.phone_number)
         code_val = self.code_var.get()
@@ -273,7 +280,7 @@ class SmsApp(customtkinter.CTk):
                     if "等待获取验证码" not in current_status: self.set_status("正在处理...")
                 elif "等待获取验证码" not in current_status:
                      status_msg = f"就绪. 剩余次数: {self.remaining_uses}"
-                     if not self.current_project_id: status_msg += " (未配置项目)" # 提示未配置项目
+                     if not self.current_project_id: status_msg += " (未配置项目)"
                      elif self.remaining_uses <= 0: status_msg += " (次数不足)"
                      self.set_status(status_msg)
         except tk.TclError: pass
@@ -281,6 +288,7 @@ class SmsApp(customtkinter.CTk):
 
 
     # --- 启动后台任务的方法 ---
+    # ... (保持不变) ...
     def start_initial_login_thread(self):
         self.set_status("正在初始化 API 连接...")
         thread = threading.Thread(target=self._initial_login_task, daemon=True); thread.start()
@@ -288,41 +296,37 @@ class SmsApp(customtkinter.CTk):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
         if self.is_working: return
         if self.remaining_uses <= 0: messagebox.showwarning("次数不足", "您的剩余使用号码数量不足，请联系管理员充值。"); self.log_message("可用号码数量不足，请联系管理员充值。"); return
-        # --- 新增：检查项目 ID 是否已设置 ---
-        if not self.current_project_id:
-            messagebox.showerror("错误", "当前用户未配置项目ID"+ADMIN_CONTACT_MSG)
-            self.log_message("错误：未配置项目ID，无法获取号码。", level="ERROR")
-            return
-        # --- 结束检查 ---
+        if not self.current_project_id: messagebox.showerror("错误", "当前用户未配置项目ID"+ADMIN_CONTACT_MSG); self.log_message("错误：未配置项目ID，无法获取号码。", level="ERROR"); return
         if not self.token or not self.server: messagebox.showerror("错误", "API 连接未就绪"+ADMIN_CONTACT_MSG); return
         if self.auto_fetch_job:
             try: self.after_cancel(self.auto_fetch_job)
             except tk.TclError: pass
             self.auto_fetch_job = None
         self.update_ui_state(True); self.phone_var.set("正在获取..."); self.code_var.set("尚未获取")
-        self.log_message(f"开始获取手机号 (项目ID: {self.current_project_id}, 剩余: {self.remaining_uses})...") # 日志中加入项目ID
+        self.log_message(f"开始获取手机号 (项目ID: {self.current_project_id}, 剩余: {self.remaining_uses})...")
         thread = threading.Thread(target=self._get_phone_task, daemon=True); thread.start()
     def start_automatic_code_fetch(self):
         self.auto_fetch_job = None
         if not self.phone_number: self.update_ui_state(False); return
-        if not self.logged_in_user_id or not self.current_project_id: return # 增加检查
+        if not self.logged_in_user_id or not self.current_project_id: return
         self.is_working = True; self.set_status("正在获取验证码..."); self.code_var.set("正在获取...")
         self.update_ui_state(True)
-        self.log_message(f"开始为 {self.phone_number} (项目ID: {self.current_project_id}) 获取验证码...") # 日志中加入项目ID
+        self.log_message(f"开始为 {self.phone_number} (项目ID: {self.current_project_id}) 获取验证码...")
         thread = threading.Thread(target=self._get_code_task_automatic, daemon=True); thread.start()
     def start_blacklist_thread(self):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
         if self.is_working: return
         if not self.phone_number: messagebox.showerror("错误", "没有可用的手机号码。"); return
-        if not self.current_project_id: messagebox.showerror("错误", "未配置项目ID"+ADMIN_CONTACT_MSG); return # 增加检查
+        if not self.current_project_id: messagebox.showerror("错误", "未配置项目ID"+ADMIN_CONTACT_MSG); return
         if self.auto_fetch_job:
             try: self.after_cancel(self.auto_fetch_job)
             except tk.TclError: pass
             self.auto_fetch_job = None; self.log_message("已取消等待获取验证码。"); self.set_status("就绪.")
         if messagebox.askyesno("确认", f"确定要拉黑号码 {self.phone_number} 吗？"):
-            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number} (项目ID: {self.current_project_id})") # 日志中加入项目ID
+            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number} (项目ID: {self.current_project_id})")
             thread = threading.Thread(target=self._blacklist_task, daemon=True); thread.start()
         else: self.log_message("拉黑操作已取消。")
+
 
     # --- 后台任务方法 ---
     def _initial_login_task(self):
@@ -336,7 +340,7 @@ class SmsApp(customtkinter.CTk):
     def _get_phone_task(self):
         phone_obtained = False
         try:
-            phone = self.get_phone_number() # get_phone_number 内部会使用 self.current_project_id
+            phone = self.get_phone_number()
             if phone:
                 phone_obtained = True
                 self.after(0, lambda p=phone: self.phone_var.set(p))
@@ -353,20 +357,22 @@ class SmsApp(customtkinter.CTk):
     def _get_code_task_automatic(self):
         code = None; restart_needed = False
         try:
-            code = self.wait_for_verification_code(timeout=200) # 内部会使用 self.current_project_id
+            code = self.wait_for_verification_code(timeout=200)
             if code:
                 self.after(0, lambda c=code: self.code_var.set(c))
                 self._play_sound_if_enabled(SUCCESS_SOUND_ALIAS)
-                if not self._decrement_usage():
+                # --- 修改：传递验证码给扣减函数 ---
+                if not self._decrement_usage(code): # 传递 code
                      messagebox.showerror("错误", "扣减次数失败"+ADMIN_CONTACT_MSG)
                      self.after(0, self.update_ui_state, False); return
+                # --- 结束修改 ---
                 self.after(0, self.update_ui_state, False)
             else: # Timeout
                 self.log_message("验证码获取超时。")
                 self.after(0, lambda: self.code_var.set("获取超时"))
                 if self.phone_number:
                     self.log_message(f"自动拉黑号码: {self.phone_number}")
-                    blacklist_success = self.blacklist_phone() # 内部会使用 self.current_project_id
+                    blacklist_success = self.blacklist_phone()
                     if blacklist_success: restart_needed = True; self.after(0, self.restart_process_after_timeout)
                     else: pass
                 else: pass
@@ -374,7 +380,7 @@ class SmsApp(customtkinter.CTk):
         finally:
             if not restart_needed: self.after(0, self.update_ui_state, False)
     def _blacklist_task(self):
-        try: self.blacklist_phone() # 内部会使用 self.current_project_id
+        try: self.blacklist_phone()
         except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG))
         finally: self.after(0, self.update_ui_state, False)
     def restart_process_after_timeout(self):
@@ -395,27 +401,38 @@ class SmsApp(customtkinter.CTk):
             except MySQLError as e: last_error = e; time.sleep(DB_RETRY_DELAY)
             except Exception as e: last_error = e; break
         self.log_message(GENERIC_ERROR_MSG, level="ERROR"); messagebox.showerror("数据库连接失败", GENERIC_ERROR_MSG + f"\n(重试 {DB_RETRY_COUNT} 次失败)"); return None
-    def _decrement_usage(self):
-        if not self.logged_in_user_id: return False
+    def _decrement_usage(self, verification_code): # 添加 verification_code 参数
+        """在 MySQL 数据库中将当前用户的剩余次数减 1，并记录日志。返回 True/False"""
+        if not self.logged_in_user_id or not self.phone_number: return False
         conn = self._get_db_connection(); cursor = None
         if not conn: return False
         try:
             cursor = conn.cursor()
-            sql = "UPDATE users SET remaining_uses = GREATEST(0, remaining_uses - 1) WHERE id = %s"
-            cursor.execute(sql, (self.logged_in_user_id,))
+            conn.start_transaction()
+            sql_update = "UPDATE users SET remaining_uses = GREATEST(0, remaining_uses - 1) WHERE id = %s"
+            cursor.execute(sql_update, (self.logged_in_user_id,))
+            # --- 修改：插入日志时包含验证码 ---
+            sql_insert_log = """
+                INSERT INTO usage_logs (user_id, phone_number, project_id, verification_code, usage_timestamp)
+                VALUES (%s, %s, %s, %s, NOW())
+            """
+            log_data = (self.logged_in_user_id, self.phone_number, self.current_project_id, verification_code) # 添加 code
+            cursor.execute(sql_insert_log, log_data)
+            # --- 结束修改 ---
             conn.commit()
             if self.remaining_uses > 0: self.remaining_uses -= 1
             self._write_usage_cache(self.remaining_uses)
-            self.log_message(f"可用号码数量已扣减，剩余: {self.remaining_uses}")
+            self.log_message(f"次数已扣减，剩余: {self.remaining_uses}")
             self.after(0, lambda: self.uses_var.set(str(self.remaining_uses)))
             return True
-        except MySQLError: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
-        except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
+        except MySQLError: conn.rollback(); self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
+        except Exception: conn.rollback(); self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
         finally:
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
 
     # --- 本地缓存方法 ---
+    # ... (保持不变) ...
     def _encode_uses(self, uses):
         try: return base64.b64encode(str(uses).encode('utf-8')).decode('utf-8')
         except: return None
@@ -440,7 +457,9 @@ class SmsApp(customtkinter.CTk):
             if os.path.exists(CACHE_FILE): os.remove(CACHE_FILE)
         except OSError: pass
 
-    # --- API 交互方法 (使用 self.current_project_id) ---
+
+    # --- API 交互方法 ---
+    # ... (保持不变) ...
     def try_login(self):
         for s in SERVERS:
             login_url = f"{s}/sms/?api=login&user={API_ACCOUNT}&pass={API_PASSWORD}"
@@ -463,10 +482,8 @@ class SmsApp(customtkinter.CTk):
         return True
     def get_phone_number(self):
         if not self.token or not self.server: self.log_message("API 未初始化"+ADMIN_CONTACT_MSG, level="ERROR"); return None
-        if not self.current_project_id: self.log_message("未配置项目ID"+ADMIN_CONTACT_MSG, level="ERROR"); return None # 检查项目ID
-        # --- 修改：使用 self.current_project_id ---
+        if not self.current_project_id: self.log_message("未配置项目ID"+ADMIN_CONTACT_MSG, level="ERROR"); return None
         url = f"{self.server}/sms/?api=getPhone&token={self.token}&sid={self.current_project_id}"
-        # --- 结束修改 ---
         retry_delay = 3; self.log_message("正在获取手机号...")
         while True:
             if not self.token: self.log_message("API 令牌失效"+ADMIN_CONTACT_MSG, level="ERROR"); return None
@@ -479,22 +496,16 @@ class SmsApp(customtkinter.CTk):
                     else: time.sleep(retry_delay); continue
                 elif str(code) == "-1" and ("没有可用手机号" in msg or "请稍后再试" in msg or "等待" == msg): time.sleep(retry_delay); continue
                 else:
-                    if self.handle_api_error(data, "获取手机号"):
-                        # --- 修改：更新 URL 中的 token ---
-                        url = f"{self.server}/sms/?api=getPhone&token={self.token}&sid={self.current_project_id}"
-                        # --- 结束修改 ---
-                        continue
+                    if self.handle_api_error(data, "获取手机号"): url = f"{self.server}/sms/?api=getPhone&token={self.token}&sid={self.current_project_id}"; continue
                     else: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("API 错误", "获取手机号失败"+ADMIN_CONTACT_MSG)); self.phone_number = None; return None
             except requests.exceptions.RequestException: time.sleep(5); continue
             except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); self.phone_number = None; return None
     def wait_for_verification_code(self, timeout=200):
-        if not self.token or not self.server or not self.phone_number or not self.current_project_id: return None # 增加检查
+        if not self.token or not self.server or not self.phone_number or not self.current_project_id: return None
         start_time = time.time(); polling_interval = 4
         while time.time() - start_time < timeout:
             if not self.token: return None
-            # --- 修改：使用 self.current_project_id ---
             params = {"api": "getMessage", "token": self.token, "sid": self.current_project_id, "phone": self.phone_number}
-            # --- 结束修改 ---
             url = f"{self.server}/sms/?{urlencode(params)}"
             try:
                 response = requests.get(url, headers=headers, timeout=15, verify=True)
@@ -505,22 +516,15 @@ class SmsApp(customtkinter.CTk):
                         if len(verification_code) > 1 and verification_code.isalnum(): self.log_message(f"成功获取验证码: {verification_code}"); return verification_code
                 elif "尚未接收到短信" in msg or (code == -1 and msg == "等待"): pass
                 else:
-                    if self.handle_api_error(data, "获取验证码"):
-                         # --- 修改：更新 params 中的 token ---
-                         params["token"] = self.token
-                         url = f"{self.server}/sms/?{urlencode(params)}"
-                         # --- 结束修改 ---
-                         continue
+                    if self.handle_api_error(data, "获取验证码"): params["token"] = self.token; url = f"{self.server}/sms/?{urlencode(params)}"; continue
                     else: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("API 错误", "获取验证码失败"+ADMIN_CONTACT_MSG)); return None
             except requests.exceptions.RequestException: pass
             except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); return None
             time.sleep(polling_interval)
         return None # Timeout
     def blacklist_phone(self):
-        if not self.token or not self.server or not self.phone_number or not self.current_project_id: return False # 增加检查
-        # --- 修改：使用 self.current_project_id ---
+        if not self.token or not self.server or not self.phone_number or not self.current_project_id: return False
         url = f"{self.server}/sms/?api=addBlacklist&token={self.token}&sid={self.current_project_id}&phone={self.phone_number}"
-        # --- 结束修改 ---
         try:
             response = requests.get(url, headers=headers, timeout=10, verify=True)
             data = response.json()
@@ -562,6 +566,42 @@ class SmsApp(customtkinter.CTk):
     def _on_app_closing(self):
         self._delete_usage_cache()
         self.destroy()
+    def logout(self):
+        """处理注销/切换账号逻辑"""
+        if self.is_working:
+            messagebox.showwarning("请稍候", "请等待当前操作完成后再注销。")
+            return
+
+        # 清理 keyring
+        if self.logged_in_username:
+            try:
+                keyring.delete_password(KEYRING_SERVICE_NAME, self.logged_in_username)
+                keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
+                keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
+            except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError):
+                pass # 忽略错误
+
+        # 清理内存状态
+        self.token = None; self.phone_number = None; self.server = None
+        self.logged_in_user_id = None; self.logged_in_username = None; self.remaining_uses = 0
+        self.current_project_id = None; self.current_project_name = self.default_title
+
+        # 清理缓存
+        self._delete_usage_cache()
+
+        # 重置 UI
+        self.title(f"{self.default_title} - 未登录")
+        self.username_var.set("未登录")
+        self.uses_var.set("--")
+        self.phone_var.set("尚未获取")
+        self.code_var.set("尚未获取")
+        self.update_ui_state(False) # 禁用按钮
+        self.log_message("用户已注销。")
+        self.status_var.set("已注销，请登录。")
+
+        # 隐藏主窗口并显示登录窗口
+        self.withdraw()
+        self.show_login_window()
 
 
 # --- 登录窗口类 ---
@@ -636,16 +676,14 @@ class LoginWindow(customtkinter.CTkToplevel):
         if not conn: return
         try:
             cursor = conn.cursor(dictionary=True)
-            # --- 修改：查询时获取 project_id 和 project_name ---
             sql = "SELECT id, username, password_hash, remaining_uses, project_id, project_name FROM users WHERE username = %s"
             cursor.execute(sql, (username,))
             user_row = cursor.fetchone()
             if user_row and check_password_hash(user_row["password_hash"], password):
                 self.destroy()
-                # --- 修改：传递 project_id 和 project_name ---
                 self.app.on_login_success(
                     user_row["id"], user_row["username"], user_row["remaining_uses"],
-                    user_row["project_id"], user_row["project_name"], # 传递新字段
+                    user_row["project_id"], user_row["project_name"],
                     remember, password, auto_login
                 )
             else: messagebox.showerror("登录失败", "用户名或密码错误。", parent=self)
