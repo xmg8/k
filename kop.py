@@ -3,7 +3,7 @@ import time
 from urllib.parse import urlencode
 import os
 import customtkinter
-from tkinter import messagebox, StringVar, BooleanVar, W, E, LEFT, DISABLED, NORMAL, END, BOTH, X, Y, SUNKEN, WORD, NSEW, EW, RIGHT # 导入 RIGHT
+from tkinter import messagebox, StringVar, BooleanVar, W, E, LEFT, DISABLED, NORMAL, END, BOTH, X, Y, SUNKEN, WORD, NSEW, EW, RIGHT
 import threading
 import sys
 import ssl
@@ -14,6 +14,7 @@ import winsound
 import base64
 import keyring
 import keyring.errors
+import pyperclip # 用于复制到剪贴板，需要安装: pip install pyperclip
 
 # --- MySQL Database Configuration ---
 MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
@@ -37,31 +38,36 @@ else: application_path = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(application_path, "usage_cache.dat")
 
 # --- API 请求头 ---
-headers = {'User-Agent': 'Mozilla/5.0 ...'} # 保持不变
+headers = {'User-Agent': 'Mozilla/5.0 ...'}
 
 # --- 常量 ---
 GENERIC_ERROR_MSG = "发生错误，请联系管理员。"
 ADMIN_CONTACT_MSG = "，请联系管理员。"
 DB_RETRY_COUNT = 10; DB_RETRY_DELAY = 2
-ADMIN_CONTACT_INFO = "如需账号或充值，请联系管理员 QQ/微信: 954158026"
+ADMIN_CONTACT_NUMBER = "954158026" # 单独定义号码
+ADMIN_CONTACT_INFO_LINE1 = "如需账号或充值，请联系管理员"
+ADMIN_CONTACT_INFO_LINE2 = f"QQ/微信: {ADMIN_CONTACT_NUMBER}"
 ANNOUNCEMENT_TEXT = """
 【使用说明】
-1. 登录后，点击“获取手机号”按钮，程序会自动获取一个临时手机号码显示在上方。【有时获取手机号码需要一些时间，请耐心等待】
-2. 将此号码只能用于【无尽冬日】手游注册，其他项目请于管理员联系。
-3. 成功接收到验证码后会显示在上方，并扣减一次可用次数，【无论是否可以成功注册游戏都会扣减，如不能接受请联系管理员退款】
-4. 如果长时间未收到验证码（约3分半钟），程序会自动将该号码拉黑并重新获取新号码，你也可以手动点击“拉黑号码”放弃当前号码，此操作不会扣减可用次数。
-5. 复制按钮可方便复制号码和验证码。
-6. 声音提示可在左下角勾选开启或关闭。
+1. 登录后，点击“获取手机号”按钮。
+2. 程序会自动获取一个临时手机号码显示在上方。
+3. 将此号码用于你需要接收验证码的服务。
+4. 程序将在获取号码10秒后自动开始接收验证码。
+5. 成功接收到验证码后会显示在上方，并自动扣减一次使用次数。
+6. 如果长时间未收到验证码（约3分半钟），程序会自动将该号码拉黑并重新获取新号码。
+7. 你也可以手动点击“拉黑号码”放弃当前号码。
+8. 复制按钮可方便复制号码和验证码。
+9. 声音提示可在左下角勾选开启或关闭。
+
 【注意事项】
 - 请勿将获取的号码用于非法用途。
-- 如遇任何问题或可用次数用尽，请联系管理员处理。
+- 如遇任何问题或次数用尽，请联系管理员。
 """
 KEYRING_SERVICE_NAME = "WujinDongriJieMaTool"
-# --- 统一使用的声音别名 ---
-SUCCESS_SOUND_ALIAS = "SystemDefault" # 使用默认系统声音
-# --- 或者使用自定义 WAV 文件 (需要取消注释并确保文件存在) ---
+SUCCESS_SOUND_ALIAS = "SystemQuestion" # 尝试 Question 声音
+# --- 或者使用自定义 WAV 文件 ---
 # SOUNDS_DIR = os.path.join(application_path, "sounds")
-# SUCCESS_SOUND_FILE = os.path.join(SOUNDS_DIR, "success.wav") # 你的 WAV 文件名
+# SUCCESS_SOUND_FILE = os.path.join(SOUNDS_DIR, "success.wav")
 
 # --- 数据库连接测试 ---
 def test_database_connection():
@@ -82,7 +88,7 @@ class SmsApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
         self.title("无尽冬日接码工具 - 未登录")
-        self.geometry("700x650")
+        self.geometry("700x700") # 再次增加高度以适应可滚动公告
         customtkinter.set_appearance_mode("System")
         customtkinter.set_default_color_theme("blue")
 
@@ -92,19 +98,23 @@ class SmsApp(customtkinter.CTk):
 
         self._create_main_widgets()
         self.protocol("WM_DELETE_WINDOW", self._on_app_closing)
-        self.withdraw() # 主窗口初始隐藏
+        self.withdraw()
 
-        # --- 尝试自动登录 ---
         if not self.attempt_auto_login():
-            # 自动登录失败或未启用，显示登录窗口
             self.after(100, self.show_login_window)
-        # --- 结束自动登录 ---
 
     def _create_main_widgets(self):
-        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1)
+        self.grid_columnconfigure(0, weight=1)
+        # --- 调整行权重 ---
+        self.grid_rowconfigure(1, weight=1) # 公告区域可扩展
+        self.grid_rowconfigure(2, weight=1) # 日志区域可扩展
+        # --- 结束调整 ---
+
         control_frame = customtkinter.CTkFrame(self, corner_radius=10)
         control_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky=NSEW)
         control_frame.grid_columnconfigure(1, weight=1); control_frame.grid_columnconfigure(3, weight=0)
+
+        # ... (剩余次数、当前用户、手机号、验证码标签和输入框保持不变) ...
         customtkinter.CTkLabel(control_frame, text="剩余次数:", anchor="w").grid(row=0, column=0, padx=10, pady=5, sticky=W)
         self.uses_var = StringVar(value="--"); self.uses_label = customtkinter.CTkLabel(control_frame, textvariable=self.uses_var, width=100, anchor="w")
         self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=W)
@@ -130,20 +140,30 @@ class SmsApp(customtkinter.CTk):
         sound_check = customtkinter.CTkCheckBox(control_frame, text="声音提示", variable=self.sound_enabled_var)
         sound_check.grid(row=3, column=0, columnspan=2, padx=10, pady=10, sticky=W)
 
-        announcement_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        announcement_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky=NSEW)
-        announcement_frame.grid_rowconfigure(1, weight=1); announcement_frame.grid_columnconfigure(0, weight=1)
-        customtkinter.CTkLabel(announcement_frame, text="公告与说明:", font=customtkinter.CTkFont(weight="bold")).grid(row=0, column=0, padx=0, pady=(0,5), sticky="w")
-        self.announcement_text = customtkinter.CTkTextbox(announcement_frame, wrap=WORD, state=DISABLED, corner_radius=8, height=150)
-        self.announcement_text.grid(row=1, column=0, sticky=NSEW)
-        self.announcement_text.configure(state=NORMAL); self.announcement_text.insert(END, ANNOUNCEMENT_TEXT.strip()); self.announcement_text.configure(state=DISABLED)
+        # --- 公告区域 (使用 ScrollableFrame) ---
+        announcement_outer_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
+        announcement_outer_frame.grid(row=1, column=0, padx=20, pady=(0, 10), sticky=NSEW)
+        announcement_outer_frame.grid_rowconfigure(1, weight=1); announcement_outer_frame.grid_columnconfigure(0, weight=1)
 
+        customtkinter.CTkLabel(announcement_outer_frame, text="公告与说明:", font=customtkinter.CTkFont(weight="bold")).grid(row=0, column=0, padx=0, pady=(0,5), sticky="w")
+        # 创建可滚动框架
+        scrollable_frame = customtkinter.CTkScrollableFrame(announcement_outer_frame, corner_radius=8)
+        scrollable_frame.grid(row=1, column=0, sticky=NSEW)
+        scrollable_frame.grid_columnconfigure(0, weight=1) # 让内部标签可以横向填充
+
+        # 在可滚动框架内创建标签显示公告
+        announcement_label = customtkinter.CTkLabel(scrollable_frame, text=ANNOUNCEMENT_TEXT.strip(), justify=LEFT, anchor="nw") # justify=LEFT 左对齐
+        announcement_label.grid(row=0, column=0, padx=5, pady=5, sticky="ew")
+        # --- 结束公告区域 ---
+
+        # --- 日志输出区域 ---
         log_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         log_frame.grid(row=2, column=0, padx=20, pady=(0, 10), sticky=NSEW)
         log_frame.grid_rowconfigure(1, weight=1); log_frame.grid_columnconfigure(0, weight=1)
         customtkinter.CTkLabel(log_frame, text="运行日志:", font=customtkinter.CTkFont(weight="bold")).grid(row=0, column=0, padx=0, pady=(0,5), sticky="w")
         self.log_text = customtkinter.CTkTextbox(log_frame, wrap=WORD, state=DISABLED, corner_radius=8)
         self.log_text.grid(row=1, column=0, sticky=NSEW)
+        # --- 结束日志区域 ---
 
         self.status_var = StringVar(value="请先登录.")
         status_bar = customtkinter.CTkLabel(self, textvariable=self.status_var, height=25, anchor="w", padx=10)
@@ -161,12 +181,14 @@ class SmsApp(customtkinter.CTk):
         if cached_uses is not None and cached_uses <= remaining_uses: self.remaining_uses = cached_uses
         else: self.remaining_uses = remaining_uses; self._write_usage_cache(remaining_uses)
 
+        # --- 修复：确保自动登录状态也被正确保存 ---
         if remember:
             try:
                 keyring.set_password(KEYRING_SERVICE_NAME, username, password if password else "")
                 keyring.set_password(KEYRING_SERVICE_NAME, "last_user", username)
+                # 无论是否是自动登录触发的，只要勾选了“记住密码”，就根据 auto_login 参数保存状态
                 keyring.set_password(KEYRING_SERVICE_NAME, "auto_login", "true" if auto_login else "false")
-            except keyring.errors.KeyringError: pass # 忽略 keyring 错误
+            except keyring.errors.KeyringError: pass
         else:
             try:
                 last_user = keyring.get_password(KEYRING_SERVICE_NAME, "last_user")
@@ -175,6 +197,7 @@ class SmsApp(customtkinter.CTk):
                     keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
                     keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
             except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
+        # --- 结束修复 ---
 
         self.deiconify(); self.title(f"无尽冬日接码工具 - 用户: {username}")
         self.username_var.set(username); self.uses_var.set(str(self.remaining_uses))
@@ -182,19 +205,14 @@ class SmsApp(customtkinter.CTk):
         self.log_message("登录成功。")
         self.start_initial_login_thread()
         self.update_ui_state(False)
-        # --- 自动登录成功后确保窗口在前台 ---
-        self.lift()
-        self.focus_force()
-        # --- 结束确保 ---
+        self.lift(); self.focus_force()
 
     def attempt_auto_login(self):
         try:
             auto_login_flag = keyring.get_password(KEYRING_SERVICE_NAME, "auto_login")
             if auto_login_flag != "true": return False
-
             username = keyring.get_password(KEYRING_SERVICE_NAME, "last_user")
             password = keyring.get_password(KEYRING_SERVICE_NAME, username)
-
             if not username or password is None: return False
 
             conn = self._get_db_connection(); cursor = None
@@ -205,13 +223,12 @@ class SmsApp(customtkinter.CTk):
                 cursor.execute(sql, (username,))
                 user_row = cursor.fetchone()
                 if user_row and check_password_hash(user_row["password_hash"], password):
-                    # --- 修改：自动登录成功后，延迟调用 on_login_success ---
-                    # 直接调用可能导致主窗口还未完全准备好
-                    self.after(50, lambda: self.on_login_success(user_row["id"], user_row["username"], user_row["remaining_uses"], remember=True, auto_login=True))
-                    # --- 结束修改 ---
+                    # --- 修复：传递正确的 password 和 auto_login 状态 ---
+                    self.after(50, lambda: self.on_login_success(user_row["id"], user_row["username"], user_row["remaining_uses"], remember=True, password=password, auto_login=True))
+                    # --- 结束修复 ---
                     return True
-                else:
-                    try: # 清理无效凭证
+                else: # 凭证无效
+                    try:
                         keyring.delete_password(KEYRING_SERVICE_NAME, username)
                         keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
                         keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
@@ -225,6 +242,7 @@ class SmsApp(customtkinter.CTk):
         except keyring.errors.KeyringError: return False
         except Exception: return False
 
+    # ... (SmsApp 的其他方法保持不变, 包括日志、状态、UI更新、后台任务、数据库、缓存、API、GUI辅助方法) ...
     # --- 日志、状态、UI 更新 ---
     def log_message(self, message, level="INFO"):
         if level == "INFO" and self: self.after(0, self._append_log, message)
@@ -515,13 +533,12 @@ class SmsApp(customtkinter.CTk):
         try: self.phone_var.set("已拉黑"); self.code_var.set("尚未获取"); self.update_ui_state(self.is_working)
         except tk.TclError: pass
     def _play_sound_if_enabled(self, sound_source, is_file=False):
-        """如果启用了声音提示，则播放指定的声音"""
         if self.sound_enabled_var.get():
             try:
                 flags = winsound.SND_ASYNC
                 if is_file:
                     if os.path.exists(sound_source): flags |= winsound.SND_FILENAME
-                    else: sound_source = "SystemDefault"; flags |= winsound.SND_ALIAS # 文件不存在则播放默认声音
+                    else: sound_source = "SystemDefault"; flags |= winsound.SND_ALIAS
                 else: flags |= winsound.SND_ALIAS
                 winsound.PlaySound(sound_source, flags)
             except Exception: pass
@@ -530,22 +547,22 @@ class SmsApp(customtkinter.CTk):
         self.destroy()
 
 
-# --- 登录窗口类 (添加记住密码和自动登录, 调整按钮位置) ---
+# --- 登录窗口类 ---
 class LoginWindow(customtkinter.CTkToplevel):
     def __init__(self, parent, app_instance):
         super().__init__(parent)
         self.parent = parent; self.app = app_instance
-        self.title("用户登录"); self.geometry("350x280"); self.resizable(False, False)
+        self.title("用户登录"); self.geometry("380x320"); self.resizable(False, False) # 调整大小
         self.protocol("WM_DELETE_WINDOW", self._on_closing); self.grab_set(); self.transient(parent)
         self.grid_columnconfigure(1, weight=1)
 
         customtkinter.CTkLabel(self, text="用户名:").grid(row=0, column=0, padx=(20, 5), pady=10, sticky="w")
-        self.username_entry = customtkinter.CTkEntry(self, width=200); self.username_entry.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="ew")
+        self.username_entry = customtkinter.CTkEntry(self, width=200); self.username_entry.grid(row=0, column=1, columnspan=2, padx=(0, 20), pady=10, sticky="ew") # columnspan=2
         customtkinter.CTkLabel(self, text="密  码:").grid(row=1, column=0, padx=(20, 5), pady=10, sticky="w")
-        self.password_entry = customtkinter.CTkEntry(self, show="*", width=200); self.password_entry.grid(row=1, column=1, padx=(0, 20), pady=10, sticky="ew")
+        self.password_entry = customtkinter.CTkEntry(self, show="*", width=200); self.password_entry.grid(row=1, column=1, columnspan=2, padx=(0, 20), pady=10, sticky="ew") # columnspan=2
 
         option_frame = customtkinter.CTkFrame(self, fg_color="transparent")
-        option_frame.grid(row=2, column=0, columnspan=2, padx=20, pady=5, sticky="w")
+        option_frame.grid(row=2, column=0, columnspan=3, padx=20, pady=5, sticky="w") # columnspan=3
         self.remember_var = BooleanVar()
         self.remember_check = customtkinter.CTkCheckBox(option_frame, text="记住密码", variable=self.remember_var, command=self._on_remember_change)
         self.remember_check.pack(side=LEFT, padx=(0, 10))
@@ -553,14 +570,25 @@ class LoginWindow(customtkinter.CTkToplevel):
         self.autologin_check = customtkinter.CTkCheckBox(option_frame, text="自动登录", variable=self.autologin_var, state=DISABLED)
         self.autologin_check.pack(side=LEFT)
 
-        button_frame = customtkinter.CTkFrame(self, fg_color="transparent"); button_frame.grid(row=3, column=0, columnspan=2, pady=15)
-        # --- 修改按钮顺序 ---
-        customtkinter.CTkButton(button_frame, text="退出", command=self._on_closing, fg_color="gray", hover_color="dimgray").pack(side=RIGHT, padx=10) # 退出在右
-        customtkinter.CTkButton(button_frame, text="登录", command=self._login).pack(side=RIGHT, padx=10) # 登录在右二
+        button_frame = customtkinter.CTkFrame(self, fg_color="transparent"); button_frame.grid(row=3, column=0, columnspan=3, pady=15) # columnspan=3
+        # --- 修改按钮顺序和位置 ---
+        customtkinter.CTkButton(button_frame, text="退出", command=self._on_closing, width=80, fg_color="gray", hover_color="dimgray").pack(side=RIGHT, padx=10)
+        customtkinter.CTkButton(button_frame, text="登录", command=self._login, width=80).pack(side=RIGHT, padx=10)
         # --- 结束修改 ---
 
-        contact_label = customtkinter.CTkLabel(self, text=ADMIN_CONTACT_INFO, font=customtkinter.CTkFont(size=12, weight="bold"))
-        contact_label.grid(row=4, column=0, columnspan=2, padx=20, pady=(10, 10), sticky="ew")
+        # --- 管理员联系方式 (分行并添加复制按钮) ---
+        contact_frame = customtkinter.CTkFrame(self, fg_color="transparent")
+        contact_frame.grid(row=4, column=0, columnspan=3, padx=20, pady=(10, 10), sticky="ew") # columnspan=3
+        contact_frame.grid_columnconfigure(0, weight=1) # 让标签可以扩展
+
+        contact_label1 = customtkinter.CTkLabel(contact_frame, text=ADMIN_CONTACT_INFO_LINE1, font=customtkinter.CTkFont(size=12, weight="bold"))
+        contact_label1.grid(row=0, column=0, sticky="w")
+        contact_label2 = customtkinter.CTkLabel(contact_frame, text=ADMIN_CONTACT_INFO_LINE2, font=customtkinter.CTkFont(size=12, weight="bold"))
+        contact_label2.grid(row=1, column=0, sticky="w")
+
+        copy_contact_btn = customtkinter.CTkButton(contact_frame, text="复制联系方式", width=100, height=24, font=customtkinter.CTkFont(size=10), command=self._copy_contact)
+        copy_contact_btn.grid(row=0, column=1, rowspan=2, padx=(10, 0), sticky="e")
+        # --- 结束添加 ---
 
         self._load_credentials()
         self.username_entry.focus_set(); self.lift(); self.focus_force()
@@ -569,9 +597,9 @@ class LoginWindow(customtkinter.CTkToplevel):
     def _center_window(self):
         try:
             self.update_idletasks()
-            screen_width = self.winfo_screenwidth(); screen_height = self.winfo_screenheight()
-            window_width = self.winfo_width(); window_height = self.winfo_height()
-            x = (screen_width // 2) - (window_width // 2); y = (screen_height // 2) - (window_height // 2)
+            sw = self.winfo_screenwidth(); sh = self.winfo_screenheight()
+            ww = self.winfo_width(); wh = self.winfo_height()
+            x = (sw // 2) - (ww // 2); y = (sh // 2) - (wh // 2)
             self.geometry(f"+{x}+{y}")
         except: pass
     def _on_remember_change(self):
@@ -587,7 +615,7 @@ class LoginWindow(customtkinter.CTkToplevel):
                     self.remember_var.set(True); self._on_remember_change()
                     auto_login_flag = keyring.get_password(KEYRING_SERVICE_NAME, "auto_login")
                     if auto_login_flag == "true": self.autologin_var.set(True)
-        except keyring.errors.KeyringError: pass # 静默忽略 keyring 错误
+        except keyring.errors.KeyringError: pass
         except Exception: pass
     def _login(self):
         username = self.username_entry.get().strip(); password = self.password_entry.get()
@@ -609,11 +637,27 @@ class LoginWindow(customtkinter.CTkToplevel):
         finally:
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
+
+    def _copy_contact(self):
+        """复制管理员联系号码到剪贴板"""
+        try:
+            pyperclip.copy(ADMIN_CONTACT_NUMBER)
+            messagebox.showinfo("已复制", f"管理员联系方式 {ADMIN_CONTACT_NUMBER} 已复制到剪贴板。", parent=self)
+        except Exception as e:
+            messagebox.showwarning("复制失败", f"无法复制到剪贴板: {e}", parent=self)
+
     def _on_closing(self):
         self.destroy(); self.parent.destroy()
 
 # --- 程序主入口 ---
 if __name__ == "__main__":
+    # 检查 pyperclip 是否安装
+    try:
+        import pyperclip
+    except ImportError:
+        messagebox.showerror("缺少库", "运行本程序需要安装 pyperclip 库。\n请运行: pip install pyperclip")
+        sys.exit(1)
+
     if not test_database_connection(): sys.exit(1)
     app = SmsApp()
     app.mainloop()
