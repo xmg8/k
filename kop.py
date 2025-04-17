@@ -21,10 +21,10 @@ MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "
 MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
 MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
 MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
-
 # --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
 API_PASSWORD = "2128c8ba18eba394cbfb99c6c906a9b5199d9f94cd825fbcd30c41a0745281e3"
+# PROJECT_ID 不再需要全局定义
 SERVERS = [
     "https://api.haozhuma.com", "https://api.haozhuma.cn",
     "https://api.haozhuyun.com", "https://api.haozhuyun.cn"
@@ -37,7 +37,7 @@ else: application_path = os.path.dirname(os.path.abspath(__file__))
 CACHE_FILE = os.path.join(application_path, "usage_cache.dat")
 
 # --- API 请求头 ---
-headers = {'User-Agent': 'Mozilla/5.0 ...'}
+headers = {'User-Agent': 'Mozilla/5.0 ...'} # 保持不变
 
 # --- 常量 ---
 GENERIC_ERROR_MSG = "发生错误，请联系管理员。"
@@ -71,7 +71,7 @@ def test_database_connection():
             if conn.is_connected(): conn.close(); return True
         except MySQLError:
             if attempt < DB_RETRY_COUNT - 1: time.sleep(DB_RETRY_DELAY)
-            else: messagebox.showerror("初始化失败", GENERIC_ERROR_MSG + f"\n(尝试 {DB_RETRY_COUNT} 次后失败)"); return False
+            else: messagebox.showerror("数据库连接失败", GENERIC_ERROR_MSG + f"\n(尝试 {DB_RETRY_COUNT} 次后失败)"); return False
         except Exception:
              if attempt == DB_RETRY_COUNT - 1: messagebox.showerror("连接错误", GENERIC_ERROR_MSG)
              return False
@@ -91,6 +91,7 @@ class SmsApp(customtkinter.CTk):
         self.is_working = False; self.auto_fetch_job = None
         self.logged_in_user_id = None; self.logged_in_username = None; self.remaining_uses = 0
         self.current_project_id = None; self.current_project_name = self.default_title
+        self.stop_code_fetching = threading.Event() # 用于停止验证码获取线程的事件
 
         self._create_main_widgets()
         self.protocol("WM_DELETE_WINDOW", self._on_app_closing)
@@ -104,13 +105,8 @@ class SmsApp(customtkinter.CTk):
         control_frame = customtkinter.CTkFrame(self, corner_radius=10)
         control_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky=NSEW)
         control_frame.grid_columnconfigure(1, weight=1); control_frame.grid_columnconfigure(3, weight=0)
-
-        # --- 修改：增加注销按钮 ---
         logout_btn = customtkinter.CTkButton(control_frame, text="注销/切换账号", command=self.logout, width=100, height=24, font=customtkinter.CTkFont(size=10), fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
-        logout_btn.grid(row=0, column=4, padx=(10, 20), pady=5, sticky="e") # 放在最右边
-        control_frame.grid_columnconfigure(4, weight=0) # 注销按钮列不扩展
-        # --- 结束修改 ---
-
+        logout_btn.grid(row=0, column=4, padx=(10, 20), pady=5, sticky="e"); control_frame.grid_columnconfigure(4, weight=0)
         customtkinter.CTkLabel(control_frame, text="剩余次数:", anchor="w").grid(row=0, column=0, padx=10, pady=5, sticky=W)
         self.uses_var = StringVar(value="--"); self.uses_label = customtkinter.CTkLabel(control_frame, textvariable=self.uses_var, width=100, anchor="w")
         self.uses_label.grid(row=0, column=1, padx=5, pady=5, sticky=W)
@@ -165,11 +161,9 @@ class SmsApp(customtkinter.CTk):
     def on_login_success(self, user_id, username, remaining_uses, project_id, project_name, remember=False, password=None, auto_login=False):
         self.logged_in_user_id = user_id; self.logged_in_username = username;
         self.current_project_id = project_id; self.current_project_name = project_name or self.default_title
-
         cached_uses = self._read_usage_cache()
         if cached_uses is not None and cached_uses <= remaining_uses: self.remaining_uses = cached_uses
         else: self.remaining_uses = remaining_uses; self._write_usage_cache(remaining_uses)
-
         if remember:
             try:
                 keyring.set_password(KEYRING_SERVICE_NAME, username, password if password else "")
@@ -184,11 +178,10 @@ class SmsApp(customtkinter.CTk):
                     keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
                     keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
             except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
-
         self.deiconify(); self.title(f"{self.current_project_name} - 用户: {username}")
         self.username_var.set(username); self.uses_var.set(str(self.remaining_uses))
         self.status_var.set("登录成功，正在初始化 API...")
-        self.log_message("登录成功。")
+        self.log_message("登录成功。") # 保持你精简后的日志
         self.start_initial_login_thread()
         self.update_ui_state(False)
         self.lift(); self.focus_force()
@@ -200,7 +193,6 @@ class SmsApp(customtkinter.CTk):
             username = keyring.get_password(KEYRING_SERVICE_NAME, "last_user")
             password = keyring.get_password(KEYRING_SERVICE_NAME, username)
             if not username or password is None: return False
-
             conn = self._get_db_connection(); cursor = None
             if not conn: return False
             try:
@@ -209,14 +201,11 @@ class SmsApp(customtkinter.CTk):
                 cursor.execute(sql, (username,))
                 user_row = cursor.fetchone()
                 if user_row and check_password_hash(user_row["password_hash"], password):
-                    # --- 修改：检查剩余次数 ---
                     if user_row["remaining_uses"] <= 0:
                         messagebox.showwarning("自动登录失败", "您的可用次数不足，请联系管理员充值。")
-                        # 清理自动登录标志，但不清除密码，方便用户手动登录
                         try: keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
                         except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
-                        return False # 次数不足，阻止自动登录
-                    # --- 结束检查 ---
+                        return False
                     self.after(50, lambda: self.on_login_success(
                         user_row["id"], user_row["username"], user_row["remaining_uses"],
                         user_row["project_id"], user_row["project_name"],
@@ -263,10 +252,13 @@ class SmsApp(customtkinter.CTk):
         code_available = code_val and code_val not in ["尚未获取", "获取失败", "获取异常", "获取超时或失败", "正在获取...", "等待获取...", "已拉黑"]
         try:
             self.get_phone_btn.configure(state=get_phone_state)
-            blacklist_state = DISABLED if not is_logged_in or working or not phone_available else NORMAL
+            # --- 修改：拉黑按钮状态不再受 working 影响 ---
+            blacklist_state = DISABLED if not is_logged_in or not phone_available else NORMAL
+            self.blacklist_btn.configure(state=blacklist_state)
+            # --- 结束修改 ---
             copy_phone_state = DISABLED if not phone_available else NORMAL
             copy_code_state = DISABLED if not is_logged_in or working or not code_available else NORMAL
-            self.blacklist_btn.configure(state=blacklist_state); self.copy_phone_btn.configure(state=copy_phone_state); self.copy_code_btn.configure(state=copy_code_state)
+            self.copy_phone_btn.configure(state=copy_phone_state); self.copy_code_btn.configure(state=copy_code_state)
             self.phone_entry.configure(state=NORMAL if phone_available else DISABLED)
             self.code_entry.configure(state=NORMAL if code_available else DISABLED)
             if not is_logged_in: self.set_status("请先登录.")
@@ -282,11 +274,9 @@ class SmsApp(customtkinter.CTk):
         except tk.TclError: pass
         except AttributeError: pass
 
-
     # --- 启动后台任务的方法 ---
-
     def start_initial_login_thread(self):
-        self.set_status("正在初始化连接...")
+        self.set_status("正在初始化 API 连接...")
         thread = threading.Thread(target=self._initial_login_task, daemon=True); thread.start()
     def start_get_phone_thread(self):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
@@ -299,7 +289,7 @@ class SmsApp(customtkinter.CTk):
             except tk.TclError: pass
             self.auto_fetch_job = None
         self.update_ui_state(True); self.phone_var.set("正在获取..."); self.code_var.set("尚未获取")
-        self.log_message(f"开始获取手机号 (可用号码数量: {self.remaining_uses})")
+        self.log_message(f"开始获取手机号 (剩余: {self.remaining_uses})...")
         thread = threading.Thread(target=self._get_phone_task, daemon=True); thread.start()
     def start_automatic_code_fetch(self):
         self.auto_fetch_job = None
@@ -307,22 +297,28 @@ class SmsApp(customtkinter.CTk):
         if not self.logged_in_user_id or not self.current_project_id: return
         self.is_working = True; self.set_status("正在获取验证码..."); self.code_var.set("正在获取...")
         self.update_ui_state(True)
-        self.log_message(f"开始为 {self.phone_number} ( 获取验证码）")
+        self.log_message(f"开始为 {self.phone_number} (项目ID: {self.current_project_id}) 获取验证码...")
+        self.stop_code_fetching.clear() # 清除停止标志
         thread = threading.Thread(target=self._get_code_task_automatic, daemon=True); thread.start()
     def start_blacklist_thread(self):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
-        if self.is_working: return
+        # 不再检查 is_working，允许在等待时拉黑
+        # if self.is_working: return
         if not self.phone_number: messagebox.showerror("错误", "没有可用的手机号码。"); return
         if not self.current_project_id: messagebox.showerror("错误", "未配置项目"+ADMIN_CONTACT_MSG); return
-        if self.auto_fetch_job:
+        if self.auto_fetch_job: # 取消 10 秒等待任务
             try: self.after_cancel(self.auto_fetch_job)
             except tk.TclError: pass
             self.auto_fetch_job = None; self.log_message("已取消等待获取验证码。"); self.set_status("就绪.")
+        # --- 设置停止标志 ---
+        self.stop_code_fetching.set()
+        # --- 结束设置 ---
         if messagebox.askyesno("确认", f"确定要拉黑号码 {self.phone_number} 吗？"):
-            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number}")
+            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number} (项目ID: {self.current_project_id})")
             thread = threading.Thread(target=self._blacklist_task, daemon=True); thread.start()
-        else: self.log_message("拉黑操作已取消。")
-
+        else:
+            self.stop_code_fetching.clear() # 用户取消，清除标志
+            self.log_message("拉黑操作已取消。")
 
     # --- 后台任务方法 ---
     def _initial_login_task(self):
@@ -340,7 +336,7 @@ class SmsApp(customtkinter.CTk):
             if phone:
                 phone_obtained = True
                 self.after(0, lambda p=phone: self.phone_var.set(p))
-                self.after(0, self.update_ui_state, False)
+                self.after(0, self.update_ui_state, False) # 使复制/拉黑可用
                 self._play_sound_if_enabled(SUCCESS_SOUND_ALIAS)
                 self.log_message("号码获取成功，10 秒后开始接收验证码...")
                 self.set_status("等待获取验证码 (10s)...")
@@ -357,13 +353,14 @@ class SmsApp(customtkinter.CTk):
             if code:
                 self.after(0, lambda c=code: self.code_var.set(c))
                 self._play_sound_if_enabled(SUCCESS_SOUND_ALIAS)
-                # --- 修改：传递验证码给扣减函数 ---
                 if not self._decrement_usage(code): # 传递 code
                      messagebox.showerror("错误", "扣减次数失败"+ADMIN_CONTACT_MSG)
                      self.after(0, self.update_ui_state, False); return
-                # --- 结束修改 ---
                 self.after(0, self.update_ui_state, False)
-            else: # Timeout
+            elif self.stop_code_fetching.is_set(): # 如果是手动中断的
+                self.log_message("验证码获取已手动中断。")
+                self.after(0, self.update_ui_state, False) # 结束工作状态
+            else: # Timeout occurred
                 self.log_message("验证码获取超时。")
                 self.after(0, lambda: self.code_var.set("获取超时"))
                 if self.phone_number:
@@ -378,7 +375,9 @@ class SmsApp(customtkinter.CTk):
     def _blacklist_task(self):
         try: self.blacklist_phone()
         except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG))
-        finally: self.after(0, self.update_ui_state, False)
+        finally:
+            self.stop_code_fetching.clear() # 清除停止标志
+            self.after(0, self.update_ui_state, False)
     def restart_process_after_timeout(self):
         try:
             self.log_message("验证码超时，自动重新获取手机号...")
@@ -397,8 +396,7 @@ class SmsApp(customtkinter.CTk):
             except MySQLError as e: last_error = e; time.sleep(DB_RETRY_DELAY)
             except Exception as e: last_error = e; break
         self.log_message(GENERIC_ERROR_MSG, level="ERROR"); messagebox.showerror("数据库连接失败", GENERIC_ERROR_MSG + f"\n(重试 {DB_RETRY_COUNT} 次失败)"); return None
-    def _decrement_usage(self, verification_code): # 添加 verification_code 参数
-        """在 MySQL 数据库中将当前用户的剩余次数减 1，并记录日志。返回 True/False"""
+    def _decrement_usage(self, verification_code):
         if not self.logged_in_user_id or not self.phone_number: return False
         conn = self._get_db_connection(); cursor = None
         if not conn: return False
@@ -407,18 +405,16 @@ class SmsApp(customtkinter.CTk):
             conn.start_transaction()
             sql_update = "UPDATE users SET remaining_uses = GREATEST(0, remaining_uses - 1) WHERE id = %s"
             cursor.execute(sql_update, (self.logged_in_user_id,))
-            # --- 修改：插入日志时包含验证码 ---
             sql_insert_log = """
                 INSERT INTO usage_logs (user_id, phone_number, project_id, verification_code, usage_timestamp)
                 VALUES (%s, %s, %s, %s, NOW())
             """
-            log_data = (self.logged_in_user_id, self.phone_number, self.current_project_id, verification_code) # 添加 code
+            log_data = (self.logged_in_user_id, self.phone_number, self.current_project_id, verification_code)
             cursor.execute(sql_insert_log, log_data)
-            # --- 结束修改 ---
             conn.commit()
             if self.remaining_uses > 0: self.remaining_uses -= 1
             self._write_usage_cache(self.remaining_uses)
-            self.log_message(f"次数已扣减，剩余: {self.remaining_uses}")
+            self.log_message(f"可用号码数量已扣减，剩余: {self.remaining_uses}")
             self.after(0, lambda: self.uses_var.set(str(self.remaining_uses)))
             return True
         except MySQLError: conn.rollback(); self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
@@ -428,7 +424,6 @@ class SmsApp(customtkinter.CTk):
             if conn and conn.is_connected(): conn.close()
 
     # --- 本地缓存方法 ---
-    # ... (保持不变) ...
     def _encode_uses(self, uses):
         try: return base64.b64encode(str(uses).encode('utf-8')).decode('utf-8')
         except: return None
@@ -453,9 +448,7 @@ class SmsApp(customtkinter.CTk):
             if os.path.exists(CACHE_FILE): os.remove(CACHE_FILE)
         except OSError: pass
 
-
     # --- API 交互方法 ---
-    # ... (保持不变) ...
     def try_login(self):
         for s in SERVERS:
             login_url = f"{s}/sms/?api=login&user={API_ACCOUNT}&pass={API_PASSWORD}"
@@ -500,6 +493,11 @@ class SmsApp(customtkinter.CTk):
         if not self.token or not self.server or not self.phone_number or not self.current_project_id: return None
         start_time = time.time(); polling_interval = 4
         while time.time() - start_time < timeout:
+            # --- 检查停止标志 ---
+            if self.stop_code_fetching.is_set():
+                self.log_message("验证码获取已手动中断。")
+                return None
+            # --- 结束检查 ---
             if not self.token: return None
             params = {"api": "getMessage", "token": self.token, "sid": self.current_project_id, "phone": self.phone_number}
             url = f"{self.server}/sms/?{urlencode(params)}"
@@ -563,41 +561,21 @@ class SmsApp(customtkinter.CTk):
         self._delete_usage_cache()
         self.destroy()
     def logout(self):
-        """处理注销/切换账号逻辑"""
-        if self.is_working:
-            messagebox.showwarning("请稍候", "请等待当前操作完成后再注销。")
-            return
-
-        # 清理 keyring
+        if self.is_working: messagebox.showwarning("请稍候", "请等待当前操作完成后再注销。"); return
         if self.logged_in_username:
             try:
                 keyring.delete_password(KEYRING_SERVICE_NAME, self.logged_in_username)
                 keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
                 keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
-            except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError):
-                pass # 忽略错误
-
-        # 清理内存状态
+            except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
         self.token = None; self.phone_number = None; self.server = None
         self.logged_in_user_id = None; self.logged_in_username = None; self.remaining_uses = 0
         self.current_project_id = None; self.current_project_name = self.default_title
-
-        # 清理缓存
         self._delete_usage_cache()
-
-        # 重置 UI
-        self.title(f"{self.default_title} - 未登录")
-        self.username_var.set("未登录")
-        self.uses_var.set("--")
-        self.phone_var.set("尚未获取")
-        self.code_var.set("尚未获取")
-        self.update_ui_state(False) # 禁用按钮
-        self.log_message("用户已注销。")
-        self.status_var.set("已注销，请登录。")
-
-        # 隐藏主窗口并显示登录窗口
-        self.withdraw()
-        self.show_login_window()
+        self.title(f"{self.default_title} - 未登录"); self.username_var.set("未登录"); self.uses_var.set("--")
+        self.phone_var.set("尚未获取"); self.code_var.set("尚未获取"); self.update_ui_state(False)
+        self.log_message("用户已注销。"); self.status_var.set("已注销，请登录。")
+        self.withdraw(); self.show_login_window()
 
 
 # --- 登录窗口类 ---
