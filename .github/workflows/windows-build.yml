@@ -52,7 +52,7 @@ jobs:
     # --name "无尽冬日接码工具": 指定生成的 .exe 文件名
     # kop.py: 你的 Python 脚本文件名
     - name: Build executable with PyInstaller
-      run: pyinstaller --onefile --windowed --name "无尽冬日接码工具" kop.py
+      run: pyinstaller --onefile --windowed --name "自助接码工具" kop.py
 
     # 第五步：上传构建产物 (Artifact)
     - name: Upload artifact
@@ -61,4 +61,4 @@ jobs:
         # Artifact 的名称
         name: WujinDongri-JieMa-Tool-Windows-exe
         # 要上传的文件路径 - 必须与上面 --name 参数生成的 .exe 文件名匹配
-        path: dist/无尽冬日接码工具.exe
+        path: dist/自助接码工具.exe
