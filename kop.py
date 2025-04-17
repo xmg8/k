@@ -12,9 +12,10 @@ from mysql.connector import Error as MySQLError
 from werkzeug.security import generate_password_hash, check_password_hash
 import winsound
 import base64
-import keyring # 导入 keyring
-import keyring.errors # 导入 keyring 错误类型
+import keyring
+import keyring.errors
 
+# --- MySQL Database Configuration ---
 MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
 MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
 MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
@@ -45,21 +46,22 @@ DB_RETRY_COUNT = 10; DB_RETRY_DELAY = 2
 ADMIN_CONTACT_INFO = "如需账号或充值，请联系管理员 QQ/微信: 954158026"
 ANNOUNCEMENT_TEXT = """
 【使用说明】
-1. 登录后，点击“获取手机号”按钮。
-2. 程序会自动获取一个临时手机号码显示在上方。
-3. 将此号码用于你需要接收验证码的服务。
-4. 程序将在获取号码10秒后自动开始接收验证码。
-5. 成功接收到验证码后会显示在上方，并自动扣减一次使用次数。
-6. 如果长时间未收到验证码（约3分半钟），程序会自动将该号码拉黑并重新获取新号码。
-7. 你也可以手动点击“拉黑号码”放弃当前号码。
-8. 复制按钮可方便复制号码和验证码。
-9. 声音提示可在左下角勾选开启或关闭。
-
+1. 登录后，点击“获取手机号”按钮，程序会自动获取一个临时手机号码显示在上方。【有时获取手机号码需要一些时间，请耐心等待】
+2. 将此号码只能用于【无尽冬日】手游注册，其他项目请于管理员联系。
+3. 成功接收到验证码后会显示在上方，并扣减一次可用次数，【无论是否可以成功注册游戏都会扣减，如不能接受请联系管理员退款】
+4. 如果长时间未收到验证码（约3分半钟），程序会自动将该号码拉黑并重新获取新号码，你也可以手动点击“拉黑号码”放弃当前号码，此操作不会扣减可用次数。
+5. 复制按钮可方便复制号码和验证码。
+6. 声音提示可在左下角勾选开启或关闭。
 【注意事项】
 - 请勿将获取的号码用于非法用途。
-- 如遇任何问题或次数用尽，请联系管理员。
+- 如遇任何问题或可用次数用尽，请联系管理员处理。
 """
-KEYRING_SERVICE_NAME = "WujinDongriJieMaTool" # 用于 keyring 存储的服务名
+KEYRING_SERVICE_NAME = "WujinDongriJieMaTool"
+# --- 统一使用的声音别名 ---
+SUCCESS_SOUND_ALIAS = "SystemDefault" # 使用默认系统声音
+# --- 或者使用自定义 WAV 文件 (需要取消注释并确保文件存在) ---
+# SOUNDS_DIR = os.path.join(application_path, "sounds")
+# SUCCESS_SOUND_FILE = os.path.join(SOUNDS_DIR, "success.wav") # 你的 WAV 文件名
 
 # --- 数据库连接测试 ---
 def test_database_connection():
@@ -99,7 +101,7 @@ class SmsApp(customtkinter.CTk):
         # --- 结束自动登录 ---
 
     def _create_main_widgets(self):
-        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1) # 日志区域扩展
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1)
         control_frame = customtkinter.CTkFrame(self, corner_radius=10)
         control_frame.grid(row=0, column=0, padx=20, pady=(20, 10), sticky=NSEW)
         control_frame.grid_columnconfigure(1, weight=1); control_frame.grid_columnconfigure(3, weight=0)
@@ -154,31 +156,25 @@ class SmsApp(customtkinter.CTk):
             self.login_window_instance = LoginWindow(self, self)
 
     def on_login_success(self, user_id, username, remaining_uses, remember=False, password=None, auto_login=False):
-        """登录成功后的回调函数，增加记住密码和自动登录处理"""
         self.logged_in_user_id = user_id; self.logged_in_username = username;
         cached_uses = self._read_usage_cache()
         if cached_uses is not None and cached_uses <= remaining_uses: self.remaining_uses = cached_uses
         else: self.remaining_uses = remaining_uses; self._write_usage_cache(remaining_uses)
 
-        # --- 处理记住密码和自动登录 ---
         if remember:
             try:
-                keyring.set_password(KEYRING_SERVICE_NAME, username, password if password else "") # 存储密码
-                keyring.set_password(KEYRING_SERVICE_NAME, "last_user", username) # 存储最后登录用户
-                keyring.set_password(KEYRING_SERVICE_NAME, "auto_login", "true" if auto_login else "false") # 存储自动登录状态
-            except keyring.errors.KeyringError as e:
-                self.log_message(f"无法保存登录凭证: {e}", level="WARN") # 记录警告，但不阻止登录
+                keyring.set_password(KEYRING_SERVICE_NAME, username, password if password else "")
+                keyring.set_password(KEYRING_SERVICE_NAME, "last_user", username)
+                keyring.set_password(KEYRING_SERVICE_NAME, "auto_login", "true" if auto_login else "false")
+            except keyring.errors.KeyringError: pass # 忽略 keyring 错误
         else:
-            # 如果取消勾选记住密码，清除存储的信息
             try:
                 last_user = keyring.get_password(KEYRING_SERVICE_NAME, "last_user")
-                if last_user == username: # 只清除当前用户的
+                if last_user == username:
                     keyring.delete_password(KEYRING_SERVICE_NAME, username)
                     keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
                     keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
-            except keyring.errors.KeyringError: pass # 忽略清除错误
-            except keyring.errors.PasswordDeleteError: pass
-        # --- 结束处理 ---
+            except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
 
         self.deiconify(); self.title(f"无尽冬日接码工具 - 用户: {username}")
         self.username_var.set(username); self.uses_var.set(str(self.remaining_uses))
@@ -186,48 +182,49 @@ class SmsApp(customtkinter.CTk):
         self.log_message("登录成功。")
         self.start_initial_login_thread()
         self.update_ui_state(False)
+        # --- 自动登录成功后确保窗口在前台 ---
+        self.lift()
+        self.focus_force()
+        # --- 结束确保 ---
 
     def attempt_auto_login(self):
-        """尝试使用存储的凭证进行自动登录"""
         try:
             auto_login_flag = keyring.get_password(KEYRING_SERVICE_NAME, "auto_login")
-            if auto_login_flag != "true": return False # 未启用自动登录
+            if auto_login_flag != "true": return False
 
             username = keyring.get_password(KEYRING_SERVICE_NAME, "last_user")
-            password = keyring.get_password(KEYRING_SERVICE_NAME, username) # 获取存储的密码
+            password = keyring.get_password(KEYRING_SERVICE_NAME, username)
 
-            if not username or password is None: return False # 没有存储的凭证
+            if not username or password is None: return False
 
-            # --- 执行登录验证 ---
             conn = self._get_db_connection(); cursor = None
-            if not conn: return False # 数据库连接失败则无法自动登录
+            if not conn: return False
             try:
                 cursor = conn.cursor(dictionary=True)
                 sql = "SELECT id, username, password_hash, remaining_uses FROM users WHERE username = %s"
                 cursor.execute(sql, (username,))
                 user_row = cursor.fetchone()
                 if user_row and check_password_hash(user_row["password_hash"], password):
-                    # 自动登录成功
-                    self.on_login_success(user_row["id"], user_row["username"], user_row["remaining_uses"], remember=True, auto_login=True) # 保持记住和自动登录状态
-                    return True # 返回成功
+                    # --- 修改：自动登录成功后，延迟调用 on_login_success ---
+                    # 直接调用可能导致主窗口还未完全准备好
+                    self.after(50, lambda: self.on_login_success(user_row["id"], user_row["username"], user_row["remaining_uses"], remember=True, auto_login=True))
+                    # --- 结束修改 ---
+                    return True
                 else:
-                    # 凭证无效（可能密码已更改），清除存储的凭证
-                    keyring.delete_password(KEYRING_SERVICE_NAME, username)
-                    keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
-                    keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
-                    return False # 自动登录失败
-            except MySQLError: return False # 数据库查询失败
-            except Exception: return False # 其他异常
+                    try: # 清理无效凭证
+                        keyring.delete_password(KEYRING_SERVICE_NAME, username)
+                        keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
+                        keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
+                    except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
+                    return False
+            except MySQLError: return False
+            except Exception: return False
             finally:
                 if cursor: cursor.close()
                 if conn and conn.is_connected(): conn.close()
-        except keyring.errors.KeyringError:
-            return False # keyring 操作失败
-        except Exception:
-            return False # 其他未知异常
+        except keyring.errors.KeyringError: return False
+        except Exception: return False
 
-    # ... (SmsApp 的其他方法保持不变) ...
-    # ... (请确保粘贴完整的 SmsApp 类代码，包括日志、状态、UI更新、后台任务、数据库、缓存、API、GUI辅助方法) ...
     # --- 日志、状态、UI 更新 ---
     def log_message(self, message, level="INFO"):
         if level == "INFO" and self: self.after(0, self._append_log, message)
@@ -325,7 +322,7 @@ class SmsApp(customtkinter.CTk):
                 phone_obtained = True
                 self.after(0, lambda p=phone: self.phone_var.set(p))
                 self.after(0, self.update_ui_state, False)
-                self._play_sound_if_enabled("SystemAsterisk")
+                self._play_sound_if_enabled(SUCCESS_SOUND_ALIAS) # 使用统一的声音
                 self.log_message("号码获取成功，10 秒后开始接收验证码...")
                 self.set_status("等待获取验证码 (10s)...")
                 try: self.auto_fetch_job = self.after(10000, self.start_automatic_code_fetch)
@@ -340,7 +337,7 @@ class SmsApp(customtkinter.CTk):
             code = self.wait_for_verification_code(timeout=200)
             if code:
                 self.after(0, lambda c=code: self.code_var.set(c))
-                self._play_sound_if_enabled("SystemHand")
+                self._play_sound_if_enabled(SUCCESS_SOUND_ALIAS) # 使用统一的声音
                 if not self._decrement_usage():
                      messagebox.showerror("错误", "扣减次数失败"+ADMIN_CONTACT_MSG)
                      self.after(0, self.update_ui_state, False); return
@@ -517,101 +514,85 @@ class SmsApp(customtkinter.CTk):
         self.phone_number = None
         try: self.phone_var.set("已拉黑"); self.code_var.set("尚未获取"); self.update_ui_state(self.is_working)
         except tk.TclError: pass
-    def _play_sound_if_enabled(self, sound_alias):
+    def _play_sound_if_enabled(self, sound_source, is_file=False):
+        """如果启用了声音提示，则播放指定的声音"""
         if self.sound_enabled_var.get():
-            try: winsound.PlaySound(sound_alias, winsound.SND_ALIAS | winsound.SND_ASYNC)
+            try:
+                flags = winsound.SND_ASYNC
+                if is_file:
+                    if os.path.exists(sound_source): flags |= winsound.SND_FILENAME
+                    else: sound_source = "SystemDefault"; flags |= winsound.SND_ALIAS # 文件不存在则播放默认声音
+                else: flags |= winsound.SND_ALIAS
+                winsound.PlaySound(sound_source, flags)
             except Exception: pass
     def _on_app_closing(self):
         self._delete_usage_cache()
         self.destroy()
 
 
-# --- 登录窗口类 (添加记住密码和自动登录) ---
+# --- 登录窗口类 (添加记住密码和自动登录, 调整按钮位置) ---
 class LoginWindow(customtkinter.CTkToplevel):
     def __init__(self, parent, app_instance):
         super().__init__(parent)
         self.parent = parent; self.app = app_instance
-        self.title("用户登录"); self.geometry("350x280"); self.resizable(False, False) # 调整大小
+        self.title("用户登录"); self.geometry("350x280"); self.resizable(False, False)
         self.protocol("WM_DELETE_WINDOW", self._on_closing); self.grab_set(); self.transient(parent)
         self.grid_columnconfigure(1, weight=1)
 
-        # --- 控件 ---
         customtkinter.CTkLabel(self, text="用户名:").grid(row=0, column=0, padx=(20, 5), pady=10, sticky="w")
         self.username_entry = customtkinter.CTkEntry(self, width=200); self.username_entry.grid(row=0, column=1, padx=(0, 20), pady=10, sticky="ew")
         customtkinter.CTkLabel(self, text="密  码:").grid(row=1, column=0, padx=(20, 5), pady=10, sticky="w")
         self.password_entry = customtkinter.CTkEntry(self, show="*", width=200); self.password_entry.grid(row=1, column=1, padx=(0, 20), pady=10, sticky="ew")
 
-        # --- 记住密码和自动登录选项 ---
         option_frame = customtkinter.CTkFrame(self, fg_color="transparent")
         option_frame.grid(row=2, column=0, columnspan=2, padx=20, pady=5, sticky="w")
         self.remember_var = BooleanVar()
         self.remember_check = customtkinter.CTkCheckBox(option_frame, text="记住密码", variable=self.remember_var, command=self._on_remember_change)
         self.remember_check.pack(side=LEFT, padx=(0, 10))
         self.autologin_var = BooleanVar()
-        self.autologin_check = customtkinter.CTkCheckBox(option_frame, text="自动登录", variable=self.autologin_var, state=DISABLED) # 初始禁用
+        self.autologin_check = customtkinter.CTkCheckBox(option_frame, text="自动登录", variable=self.autologin_var, state=DISABLED)
         self.autologin_check.pack(side=LEFT)
 
-        # --- 按钮框架 ---
         button_frame = customtkinter.CTkFrame(self, fg_color="transparent"); button_frame.grid(row=3, column=0, columnspan=2, pady=15)
-        # --- 修改按钮顺序和位置 ---
-        customtkinter.CTkButton(button_frame, text="退出", command=self._on_closing, fg_color="gray", hover_color="dimgray").pack(side=RIGHT, padx=10) # 退出居右
-        customtkinter.CTkButton(button_frame, text="登录", command=self._login).pack(side=RIGHT, padx=10) # 登录在退出左边
+        # --- 修改按钮顺序 ---
+        customtkinter.CTkButton(button_frame, text="退出", command=self._on_closing, fg_color="gray", hover_color="dimgray").pack(side=RIGHT, padx=10) # 退出在右
+        customtkinter.CTkButton(button_frame, text="登录", command=self._login).pack(side=RIGHT, padx=10) # 登录在右二
         # --- 结束修改 ---
 
-        # --- 管理员联系方式 ---
-        contact_label = customtkinter.CTkLabel(self, text=ADMIN_CONTACT_INFO, text_color="gray", font=customtkinter.CTkFont(size=10))
+        contact_label = customtkinter.CTkLabel(self, text=ADMIN_CONTACT_INFO, font=customtkinter.CTkFont(size=12, weight="bold"))
         contact_label.grid(row=4, column=0, columnspan=2, padx=20, pady=(10, 10), sticky="ew")
 
-        self._load_credentials() # 尝试加载记住的用户名和密码
+        self._load_credentials()
         self.username_entry.focus_set(); self.lift(); self.focus_force()
-        self._center_window() # 居中
+        self._center_window()
 
     def _center_window(self):
-        """将窗口居中于屏幕"""
         try:
             self.update_idletasks()
-            screen_width = self.winfo_screenwidth()
-            screen_height = self.winfo_screenheight()
-            window_width = self.winfo_width()
-            window_height = self.winfo_height()
-            x = (screen_width // 2) - (window_width // 2)
-            y = (screen_height // 2) - (window_height // 2)
+            screen_width = self.winfo_screenwidth(); screen_height = self.winfo_screenheight()
+            window_width = self.winfo_width(); window_height = self.winfo_height()
+            x = (screen_width // 2) - (window_width // 2); y = (screen_height // 2) - (window_height // 2)
             self.geometry(f"+{x}+{y}")
-        except: pass # 忽略可能的错误
-
+        except: pass
     def _on_remember_change(self):
-        """当“记住密码”复选框状态改变时调用"""
-        if self.remember_var.get():
-            self.autologin_check.configure(state=NORMAL) # 启用自动登录选项
-        else:
-            self.autologin_check.configure(state=DISABLED) # 禁用自动登录选项
-            self.autologin_var.set(False) # 取消自动登录
-
+        if self.remember_var.get(): self.autologin_check.configure(state=NORMAL)
+        else: self.autologin_check.configure(state=DISABLED); self.autologin_var.set(False)
     def _load_credentials(self):
-        """尝试从 keyring 加载上次登录的用户名和密码"""
         try:
             last_user = keyring.get_password(KEYRING_SERVICE_NAME, "last_user")
             if last_user:
                 password = keyring.get_password(KEYRING_SERVICE_NAME, last_user)
-                if password is not None: # 检查密码是否存在（可能只记住了用户名）
-                    self.username_entry.insert(0, last_user)
-                    self.password_entry.insert(0, password)
-                    self.remember_var.set(True) # 自动勾选记住密码
-                    self._on_remember_change() # 更新自动登录状态
-                    # 检查自动登录标志
+                if password is not None:
+                    self.username_entry.insert(0, last_user); self.password_entry.insert(0, password)
+                    self.remember_var.set(True); self._on_remember_change()
                     auto_login_flag = keyring.get_password(KEYRING_SERVICE_NAME, "auto_login")
-                    if auto_login_flag == "true":
-                        self.autologin_var.set(True)
-        except keyring.errors.KeyringError:
-            self.app.log_message("无法访问系统凭证管理器。", level="WARN") # 记录警告
-        except Exception: pass # 忽略其他可能的错误
-
+                    if auto_login_flag == "true": self.autologin_var.set(True)
+        except keyring.errors.KeyringError: pass # 静默忽略 keyring 错误
+        except Exception: pass
     def _login(self):
         username = self.username_entry.get().strip(); password = self.password_entry.get()
-        remember = self.remember_var.get()
-        auto_login = self.autologin_var.get()
+        remember = self.remember_var.get(); auto_login = self.autologin_var.get()
         if not username or not password: messagebox.showwarning("输入错误", "用户名和密码不能为空。", parent=self); return
-
         conn = self.app._get_db_connection(); cursor = None
         if not conn: return
         try:
@@ -621,7 +602,6 @@ class LoginWindow(customtkinter.CTkToplevel):
             user_row = cursor.fetchone()
             if user_row and check_password_hash(user_row["password_hash"], password):
                 self.destroy()
-                # 传递记住密码和自动登录的状态给回调函数
                 self.app.on_login_success(user_row["id"], user_row["username"], user_row["remaining_uses"], remember, password, auto_login)
             else: messagebox.showerror("登录失败", "用户名或密码错误。", parent=self)
         except MySQLError: messagebox.showerror("数据库错误", GENERIC_ERROR_MSG, parent=self)
@@ -629,7 +609,6 @@ class LoginWindow(customtkinter.CTkToplevel):
         finally:
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
-
     def _on_closing(self):
         self.destroy(); self.parent.destroy()
 
