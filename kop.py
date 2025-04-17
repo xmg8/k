@@ -25,7 +25,6 @@ MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
 # --- 好猪码 API 配置 ---
 API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
 API_PASSWORD = "2128c8ba18eba394cbfb99c6c906a9b5199d9f94cd825fbcd30c41a0745281e3"
-# PROJECT_ID 不再需要全局定义
 SERVERS = [
     "https://api.haozhuma.com", "https://api.haozhuma.cn",
     "https://api.haozhuyun.com", "https://api.haozhuyun.cn"
@@ -48,20 +47,18 @@ ADMIN_CONTACT_NUMBER = "954158026"
 ADMIN_CONTACT_INFO_LINE1 = "如需账号或充值，请联系管理员"
 ADMIN_CONTACT_INFO_LINE2 = f"QQ/微信: {ADMIN_CONTACT_NUMBER}"
 ANNOUNCEMENT_TEXT = """
-【使用说明】
-1. 登录后点击“获取手机号”按钮。
-2. 程序会自动获取临时号码并显示。
-3. 将此号码用于需要接收验证码的服务。
-4. 获取号码10秒后将自动开始接收验证码。
-5. 成功接收到验证码会显示并扣减次数。
-6. 长时间未收到(约3.5分钟)，会自动拉黑并获取新号。
-7. 可手动点击“拉黑号码”放弃当前号码。
-8. 使用复制按钮可复制号码和验证码。
-9. 左下角可开关声音提示。
-
 【注意事项】
+-重要提示！！！【号码不保证全新，成功收到验证码即刻扣费，如不能接受请停止使用！！！】
+【可先少量测试，确定可以满足要求后再使用】
 - 严禁将获取的号码用于非法用途！
 - 如遇问题或次数用尽，请联系管理员。
+============================================================================
+【使用说明】
+1. 点击“获取手机号”按钮，程序会自动获取临时号码并显示，【点击复制号码可自动复制】。
+2. 将此号码用于需要接收验证码的项目，账号对应项目请查看软件顶部显示。
+3. 成功接收到验证码就会扣费，无论是否可用！【点击复制验证码可自动复制】。
+4. 长时间未收到验证码，会自动拉黑并获取新号。
+5.  可手动点击“拉黑号码”放弃当前号码，为收到验证码不扣费。
 """
 KEYRING_SERVICE_NAME = "WujinDongriJieMaTool"
 SUCCESS_SOUND_ALIAS = "SystemQuestion"
@@ -74,7 +71,7 @@ def test_database_connection():
             if conn.is_connected(): conn.close(); return True
         except MySQLError:
             if attempt < DB_RETRY_COUNT - 1: time.sleep(DB_RETRY_DELAY)
-            else: messagebox.showerror("数据库连接失败", GENERIC_ERROR_MSG + f"\n(尝试 {DB_RETRY_COUNT} 次后失败)"); return False
+            else: messagebox.showerror("初始化失败", GENERIC_ERROR_MSG + f"\n(尝试 {DB_RETRY_COUNT} 次后失败)"); return False
         except Exception:
              if attempt == DB_RETRY_COUNT - 1: messagebox.showerror("连接错误", GENERIC_ERROR_MSG)
              return False
@@ -214,7 +211,7 @@ class SmsApp(customtkinter.CTk):
                 if user_row and check_password_hash(user_row["password_hash"], password):
                     # --- 修改：检查剩余次数 ---
                     if user_row["remaining_uses"] <= 0:
-                        messagebox.showwarning("自动登录失败", "您的剩余次数不足，请联系管理员充值。")
+                        messagebox.showwarning("自动登录失败", "您的可用次数不足，请联系管理员充值。")
                         # 清理自动登录标志，但不清除密码，方便用户手动登录
                         try: keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
                         except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
@@ -242,7 +239,6 @@ class SmsApp(customtkinter.CTk):
         except Exception: return False
 
     # --- 日志、状态、UI 更新 ---
-    # ... (保持不变) ...
     def log_message(self, message, level="INFO"):
         if level == "INFO" and self: self.after(0, self._append_log, message)
     def _append_log(self, message):
@@ -288,22 +284,22 @@ class SmsApp(customtkinter.CTk):
 
 
     # --- 启动后台任务的方法 ---
-    # ... (保持不变) ...
+
     def start_initial_login_thread(self):
-        self.set_status("正在初始化 API 连接...")
+        self.set_status("正在初始化连接...")
         thread = threading.Thread(target=self._initial_login_task, daemon=True); thread.start()
     def start_get_phone_thread(self):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
         if self.is_working: return
         if self.remaining_uses <= 0: messagebox.showwarning("次数不足", "您的剩余使用号码数量不足，请联系管理员充值。"); self.log_message("可用号码数量不足，请联系管理员充值。"); return
-        if not self.current_project_id: messagebox.showerror("错误", "当前用户未配置项目ID"+ADMIN_CONTACT_MSG); self.log_message("错误：未配置项目ID，无法获取号码。", level="ERROR"); return
+        if not self.current_project_id: messagebox.showerror("错误", "当前用户未配置项目"+ADMIN_CONTACT_MSG); self.log_message("错误：未配置项目，无法获取号码。", level="ERROR"); return
         if not self.token or not self.server: messagebox.showerror("错误", "API 连接未就绪"+ADMIN_CONTACT_MSG); return
         if self.auto_fetch_job:
             try: self.after_cancel(self.auto_fetch_job)
             except tk.TclError: pass
             self.auto_fetch_job = None
         self.update_ui_state(True); self.phone_var.set("正在获取..."); self.code_var.set("尚未获取")
-        self.log_message(f"开始获取手机号 (项目ID: {self.current_project_id}, 剩余: {self.remaining_uses})...")
+        self.log_message(f"开始获取手机号 (可用号码数量: {self.remaining_uses})")
         thread = threading.Thread(target=self._get_phone_task, daemon=True); thread.start()
     def start_automatic_code_fetch(self):
         self.auto_fetch_job = None
@@ -311,19 +307,19 @@ class SmsApp(customtkinter.CTk):
         if not self.logged_in_user_id or not self.current_project_id: return
         self.is_working = True; self.set_status("正在获取验证码..."); self.code_var.set("正在获取...")
         self.update_ui_state(True)
-        self.log_message(f"开始为 {self.phone_number} (项目ID: {self.current_project_id}) 获取验证码...")
+        self.log_message(f"开始为 {self.phone_number} ( 获取验证码...")
         thread = threading.Thread(target=self._get_code_task_automatic, daemon=True); thread.start()
     def start_blacklist_thread(self):
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
         if self.is_working: return
         if not self.phone_number: messagebox.showerror("错误", "没有可用的手机号码。"); return
-        if not self.current_project_id: messagebox.showerror("错误", "未配置项目ID"+ADMIN_CONTACT_MSG); return
+        if not self.current_project_id: messagebox.showerror("错误", "未配置项目"+ADMIN_CONTACT_MSG); return
         if self.auto_fetch_job:
             try: self.after_cancel(self.auto_fetch_job)
             except tk.TclError: pass
             self.auto_fetch_job = None; self.log_message("已取消等待获取验证码。"); self.set_status("就绪.")
         if messagebox.askyesno("确认", f"确定要拉黑号码 {self.phone_number} 吗？"):
-            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number} (项目ID: {self.current_project_id})")
+            self.update_ui_state(True); self.log_message(f"尝试拉黑号码: {self.phone_number}")
             thread = threading.Thread(target=self._blacklist_task, daemon=True); thread.start()
         else: self.log_message("拉黑操作已取消。")
 
@@ -482,7 +478,7 @@ class SmsApp(customtkinter.CTk):
         return True
     def get_phone_number(self):
         if not self.token or not self.server: self.log_message("API 未初始化"+ADMIN_CONTACT_MSG, level="ERROR"); return None
-        if not self.current_project_id: self.log_message("未配置项目ID"+ADMIN_CONTACT_MSG, level="ERROR"); return None
+        if not self.current_project_id: self.log_message("未配置项目"+ADMIN_CONTACT_MSG, level="ERROR"); return None
         url = f"{self.server}/sms/?api=getPhone&token={self.token}&sid={self.current_project_id}"
         retry_delay = 3; self.log_message("正在获取手机号...")
         while True:
