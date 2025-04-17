@@ -1,5 +1,7 @@
 requests==2.31.0
 pyinstaller==6.0.0
 Werkzeug==3.0.1
-mysql-connector-python==8.2.0 # 使用你之前指定的 8.2.0 版本，日志显示它是可用的
-customtkinter>=5.0.0 # 添加 customtkinter
+mysql-connector-python==2.2.9 # 或 8.x.x
+customtkinter>=5.0.0
+keyring>=23.0.0 # 添加 keyring
+
