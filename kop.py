@@ -71,40 +71,50 @@ class PhoneEntryWidget(customtkinter.CTkFrame):
     def __init__(self, master, app_instance, phone_info, **kwargs):
         super().__init__(master, **kwargs)
         self.app = app_instance
-        self.phone_info = phone_info # 引用包含号码、状态等信息的字典
+        self.phone_info = phone_info
 
-        self.grid_columnconfigure((1, 2, 3), weight=1) # 让标签和按钮列平均分配空间
+        self.grid_columnconfigure((0, 1, 2), weight=1) # 让前三列扩展
+        self.grid_columnconfigure(3, weight=0) # 按钮列不扩展
 
-        # 显示手机号
-        self.phone_label = customtkinter.CTkLabel(self, text=phone_info['phone'], width=120, anchor="w")
+        # 显示手机号 (可以稍微增大字体)
+        self.phone_label = customtkinter.CTkLabel(self, text=phone_info['phone'], width=120, anchor="w", font=customtkinter.CTkFont(size=13)) # 增大一点字号
         self.phone_label.grid(row=0, column=0, padx=5, pady=2, sticky="w")
 
         # 显示状态
         self.status_var = StringVar(value=phone_info.get('status', '初始化...'))
-        self.status_label = customtkinter.CTkLabel(self, textvariable=self.status_var, width=100, anchor="w")
+        self.status_label = customtkinter.CTkLabel(self, textvariable=self.status_var, width=100, anchor="w", font=customtkinter.CTkFont(size=12)) # 统一样式
         self.status_label.grid(row=0, column=1, padx=5, pady=2, sticky="w")
 
-        # 显示验证码 (初始为空)
+        # 显示验证码
         self.code_var = StringVar(value=phone_info.get('code', ''))
-        self.code_label = customtkinter.CTkLabel(self, textvariable=self.code_var, width=80, anchor="w")
+        self.code_label = customtkinter.CTkLabel(self, textvariable=self.code_var, width=80, anchor="w", font=customtkinter.CTkFont(size=12)) # 统一样式
         self.code_label.grid(row=0, column=2, padx=5, pady=2, sticky="w")
 
         # 操作按钮框架
         action_frame = customtkinter.CTkFrame(self, fg_color="transparent")
         action_frame.grid(row=0, column=3, padx=5, pady=2, sticky="e")
 
+        # --- 修改按钮样式 ---
+        button_font = customtkinter.CTkFont(family="Microsoft YaHei UI", size=11) # 尝试指定清晰字体和稍大尺寸
+        button_height = 26 # 稍微增加按钮高度
+        copy_num_width = 90 # 调整宽度
+        copy_code_width = 90
+        blacklist_width = 60
+
         # 复制号码按钮
-        self.copy_phone_btn = customtkinter.CTkButton(action_frame, text="复制号码", width=80, height=24, font=customtkinter.CTkFont(size=10), command=self._copy_phone)
+        self.copy_phone_btn = customtkinter.CTkButton(action_frame, text="复制号码", width=copy_num_width, height=button_height, font=button_font, command=self._copy_phone)
         self.copy_phone_btn.pack(side=LEFT, padx=2)
 
         # 复制验证码按钮 (初始禁用)
-        self.copy_code_btn = customtkinter.CTkButton(action_frame, text="复制验证码", width=90, height=24, font=customtkinter.CTkFont(size=10), command=self._copy_code, state=DISABLED)
+        self.copy_code_btn = customtkinter.CTkButton(action_frame, text="复制验证码", width=copy_code_width, height=button_height, font=button_font, command=self._copy_code, state=DISABLED)
         self.copy_code_btn.pack(side=LEFT, padx=2)
 
         # 拉黑按钮
-        self.blacklist_btn = customtkinter.CTkButton(action_frame, text="拉黑", width=50, height=24, font=customtkinter.CTkFont(size=10), command=self._blacklist, fg_color="firebrick", hover_color="darkred")
+        self.blacklist_btn = customtkinter.CTkButton(action_frame, text="拉黑", width=blacklist_width, height=button_height, font=button_font, command=self._blacklist, fg_color="firebrick", hover_color="darkred")
         self.blacklist_btn.pack(side=LEFT, padx=2)
+        # --- 结束修改 ---
 
+    # ... (PhoneEntryWidget 的其他方法保持不变) ...
     def update_status(self, status):
         self.status_var.set(status)
         self.phone_info['status'] = status # 更新数据源
@@ -131,6 +141,7 @@ class PhoneEntryWidget(customtkinter.CTkFrame):
     def _blacklist(self):
         # 触发主 App 的拉黑流程，传递当前 phone_info
         self.app.start_blacklist_specific_phone(self.phone_info)
+
 
 # --- 数据库连接测试 ---
 def test_database_connection():
