@@ -19,23 +19,52 @@ import pyperclip
 # ... (导入和配置保持不变, 确保导入 threading, CTkScrollableFrame) ...
 import customtkinter
 from customtkinter import CTkScrollableFrame # 明确导入
-# ...
-# --- 数据库连接测试 ---
-def test_database_connection():
-    """测试到 MySQL 数据库的连接，带重试"""
-    for attempt in range(DB_RETRY_COUNT):
-        try:
-            conn = mysql.connector.connect(
-                host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE, connect_timeout=5
-            )
-            if conn.is_connected(): conn.close(); return True
-        except MySQLError:
-            if attempt < DB_RETRY_COUNT - 1: time.sleep(DB_RETRY_DELAY)
-            else: messagebox.showerror("数据库连接失败", GENERIC_ERROR_MSG + f"\n(尝试 {DB_RETRY_COUNT} 次后失败)"); return False
-        except Exception:
-             if attempt == DB_RETRY_COUNT - 1: messagebox.showerror("连接错误", GENERIC_ERROR_MSG)
-             return False
-    return False
+# --- MySQL Database Configuration ---
+MYSQL_HOST = "152.136.171.223"  # 替换为你的 MySQL 服务器地址 (e.g., "localhost", "192.168.1.100")
+MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
+MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
+MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
+# --- 好猪码 API 配置 ---
+API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
+API_PASSWORD = "2128c8ba18eba394cbfb99c6c906a9b5199d9f94cd825fbcd30c41a0745281e3"
+# PROJECT_ID 不再需要全局定义
+SERVERS = [
+    "https://api.haozhuma.com", "https://api.haozhuma.cn",
+    "https://api.haozhuyun.com", "https://api.haozhuyun.cn"
+]
+TOKEN_EXPIRED_ERROR_CODE = "E0008"
+
+# --- 路径处理 ---
+if getattr(sys, 'frozen', False): application_path = os.path.dirname(sys.executable)
+else: application_path = os.path.dirname(os.path.abspath(__file__))
+CACHE_FILE = os.path.join(application_path, "usage_cache.dat")
+
+# --- API 请求头 ---
+headers = {'User-Agent': 'Mozilla/5.0 ...'} # 保持不变
+
+# --- 常量 ---
+GENERIC_ERROR_MSG = "发生错误，请联系管理员。"
+ADMIN_CONTACT_MSG = "，请联系管理员。"
+DB_RETRY_COUNT = 10; DB_RETRY_DELAY = 2
+ADMIN_CONTACT_NUMBER = "954158026"
+ADMIN_CONTACT_INFO_LINE1 = "如需账号或充值，请联系管理员"
+ADMIN_CONTACT_INFO_LINE2 = f"QQ/微信: {ADMIN_CONTACT_NUMBER}"
+ANNOUNCEMENT_TEXT = """
+                           【注意事项】
+-重要提示！！！【号码不保证全新，成功收到验证码即刻扣费，如不能接受请停止使用！！！】
+【可先少量测试，确定可以满足要求后再使用】
+- 严禁将获取的号码用于非法用途！
+- 如遇问题或次数用尽，请联系管理员。
+=====================================================================================
+                           【使用说明】
+1. 点击“获取手机号”按钮，程序会自动获取临时号码并显示，【点击复制号码可自动复制】。
+2. 将此号码用于需要接收验证码的项目，账号对应项目请查看软件顶部显示。
+3. 成功接收到验证码就会扣费，无论是否可用！【点击复制验证码可自动复制】。
+4. 长时间未收到验证码，会自动拉黑并获取新号。
+5. 成功使用验证码后，点击“获取手机号”按钮，开始再次使用。
+"""
+KEYRING_SERVICE_NAME = "WujinDongriJieMaTool"
+SUCCESS_SOUND_ALIAS = "SystemQuestion"
     
 class PhoneEntryWidget(customtkinter.CTkFrame):
     """用于在列表中显示单个手机号信息的自定义控件"""
@@ -103,7 +132,22 @@ class PhoneEntryWidget(customtkinter.CTkFrame):
         # 触发主 App 的拉黑流程，传递当前 phone_info
         self.app.start_blacklist_specific_phone(self.phone_info)
 
-
+# --- 数据库连接测试 ---
+def test_database_connection():
+    """测试到 MySQL 数据库的连接，带重试"""
+    for attempt in range(DB_RETRY_COUNT):
+        try:
+            conn = mysql.connector.connect(
+                host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE, connect_timeout=5
+            )
+            if conn.is_connected(): conn.close(); return True
+        except MySQLError:
+            if attempt < DB_RETRY_COUNT - 1: time.sleep(DB_RETRY_DELAY)
+            else: messagebox.showerror("数据库连接失败", GENERIC_ERROR_MSG + f"\n(尝试 {DB_RETRY_COUNT} 次后失败)"); return False
+        except Exception:
+             if attempt == DB_RETRY_COUNT - 1: messagebox.showerror("连接错误", GENERIC_ERROR_MSG)
+             return False
+    return False
 class SmsApp(customtkinter.CTk):
     def __init__(self):
         super().__init__()
