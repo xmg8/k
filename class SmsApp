@@ -1,8 +1,42 @@
+import requests
+import time
+from urllib.parse import urlencode
+import os
+import customtkinter
+from tkinter import messagebox, StringVar, BooleanVar, W, E, LEFT, DISABLED, NORMAL, END, BOTH, X, Y, SUNKEN, WORD, NSEW, EW, RIGHT
+import threading
+import sys
+import ssl
+import mysql.connector
+from mysql.connector import Error as MySQLError
+from werkzeug.security import generate_password_hash, check_password_hash
+import winsound
+import base64
+import keyring
+import keyring.errors
+import pyperclip
+
 # ... (导入和配置保持不变, 确保导入 threading, CTkScrollableFrame) ...
 import customtkinter
 from customtkinter import CTkScrollableFrame # 明确导入
 # ...
-
+# --- 数据库连接测试 ---
+def test_database_connection():
+    """测试到 MySQL 数据库的连接，带重试"""
+    for attempt in range(DB_RETRY_COUNT):
+        try:
+            conn = mysql.connector.connect(
+                host=MYSQL_HOST, user=MYSQL_USER, password=MYSQL_PASSWORD, database=MYSQL_DATABASE, connect_timeout=5
+            )
+            if conn.is_connected(): conn.close(); return True
+        except MySQLError:
+            if attempt < DB_RETRY_COUNT - 1: time.sleep(DB_RETRY_DELAY)
+            else: messagebox.showerror("数据库连接失败", GENERIC_ERROR_MSG + f"\n(尝试 {DB_RETRY_COUNT} 次后失败)"); return False
+        except Exception:
+             if attempt == DB_RETRY_COUNT - 1: messagebox.showerror("连接错误", GENERIC_ERROR_MSG)
+             return False
+    return False
+    
 class PhoneEntryWidget(customtkinter.CTkFrame):
     """用于在列表中显示单个手机号信息的自定义控件"""
     def __init__(self, master, app_instance, phone_info, **kwargs):
