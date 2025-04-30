@@ -78,7 +78,7 @@ def test_database_connection():
              return False
     return False
 
-# --- 单个号码条目控件 ---
+# --- 单个号码条目控件 (添加独立的释放和拉黑按钮) ---
 class PhoneEntryWidget(customtkinter.CTkFrame):
     def __init__(self, master, app_instance, phone_info, row_index, **kwargs):
         super().__init__(master, **kwargs)
@@ -86,6 +86,7 @@ class PhoneEntryWidget(customtkinter.CTkFrame):
         if self.row_index % 2 == 0: self.configure(fg_color=("gray90", "gray20"))
         else: self.configure(fg_color=("gray80", "gray15"))
         self.grid_columnconfigure((0, 1, 2), weight=1); self.grid_columnconfigure(3, weight=0)
+
         self.phone_label = customtkinter.CTkLabel(self, text=phone_info['phone'], width=120, anchor="w", font=customtkinter.CTkFont(size=13))
         self.phone_label.grid(row=0, column=0, padx=5, pady=2, sticky="w")
         self.status_var = StringVar(value=phone_info.get('status', '初始化...'))
@@ -94,30 +95,50 @@ class PhoneEntryWidget(customtkinter.CTkFrame):
         self.code_var = StringVar(value=phone_info.get('code', ''))
         self.code_label = customtkinter.CTkLabel(self, textvariable=self.code_var, width=80, anchor="w", font=customtkinter.CTkFont(size=12))
         self.code_label.grid(row=0, column=2, padx=5, pady=2, sticky="w")
+
         action_frame = customtkinter.CTkFrame(self, fg_color="transparent")
         action_frame.grid(row=0, column=3, padx=5, pady=2, sticky="e")
+
         button_font = customtkinter.CTkFont(family="Microsoft YaHei UI", size=11, weight="bold")
-        button_height = 26; copy_num_width = 90; copy_code_width = 90; blacklist_width = 60
+        button_height = 26; copy_num_width = 80; copy_code_width = 80; release_width = 60; blacklist_width = 60
+
         self.copy_phone_btn = customtkinter.CTkButton(action_frame, text="复制号码", width=copy_num_width, height=button_height, font=button_font, command=self._copy_phone)
         self.copy_phone_btn.pack(side=LEFT, padx=2)
         self.copy_code_btn = customtkinter.CTkButton(action_frame, text="复制验证码", width=copy_code_width, height=button_height, font=button_font, command=self._copy_code, state=DISABLED)
         self.copy_code_btn.pack(side=LEFT, padx=2)
+        # --- 添加独立的释放按钮 ---
+        self.release_btn = customtkinter.CTkButton(action_frame, text="释放", width=release_width, height=button_height, font=button_font, command=self._release, fg_color="dodgerblue", hover_color="steelblue")
+        self.release_btn.pack(side=LEFT, padx=2)
+        # --- 结束添加 ---
+        # --- 恢复拉黑按钮 ---
         self.blacklist_btn = customtkinter.CTkButton(action_frame, text="拉黑", width=blacklist_width, height=button_height, font=button_font, command=self._blacklist, fg_color="firebrick", hover_color="darkred")
         self.blacklist_btn.pack(side=LEFT, padx=2)
+        # --- 结束恢复 ---
+
     def update_status(self, status): self.status_var.set(status); self.phone_info['status'] = status
     def update_code(self, code): self.code_var.set(code); self.phone_info['code'] = code; self.copy_code_btn.configure(state=NORMAL if code else DISABLED)
-    def disable_actions(self): self.copy_phone_btn.configure(state=DISABLED); self.copy_code_btn.configure(state=DISABLED); self.blacklist_btn.configure(state=DISABLED)
+    def disable_actions(self):
+        self.copy_phone_btn.configure(state=DISABLED)
+        self.copy_code_btn.configure(state=DISABLED)
+        self.release_btn.configure(state=DISABLED) # 禁用释放按钮
+        self.blacklist_btn.configure(state=DISABLED)
     def _copy_phone(self): self.app.copy_text(self.phone_info['phone'], "号码")
     def _copy_code(self): code = self.code_var.get(); self.app.copy_text(code, "验证码") if code else self.app.log_message("没有验证码可复制。")
-    def _blacklist(self): self.app.start_blacklist_specific_phone(self.phone_info)
+    def _release(self): # 新增释放方法
+        self.app.start_release_specific_phone(self.phone_info)
+    def _blacklist(self): # 恢复拉黑方法
+        self.app.start_blacklist_specific_phone(self.phone_info)
+
 
 # --- GUI 应用主类 ---
 class SmsApp(customtkinter.CTk):
+    # ... (__init__, _create_main_widgets, show_login_window, on_login_success, attempt_auto_login, 日志, 状态, UI 更新 保持不变) ...
+    # ... (请确保粘贴完整的 SmsApp 类代码) ...
     def __init__(self):
         super().__init__()
         self.default_title = "通用接码工具"
         self.title(f"{self.default_title} - 未登录")
-        self.geometry("850x700")
+        self.geometry("850x700") # 可能需要更宽以容纳按钮
         customtkinter.set_appearance_mode("System")
         customtkinter.set_default_color_theme("blue")
 
@@ -138,11 +159,12 @@ class SmsApp(customtkinter.CTk):
             self.after(100, self.show_login_window)
 
     def _create_main_widgets(self):
-        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1) # 日志区域扩展
+        self.grid_columnconfigure(0, weight=1); self.grid_rowconfigure(2, weight=1)
 
         top_frame = customtkinter.CTkFrame(self, corner_radius=0, fg_color="transparent")
         top_frame.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        top_frame.grid_columnconfigure(5, weight=1)
+        top_frame.grid_columnconfigure(6, weight=1) # 调整权重列
+
         logout_btn = customtkinter.CTkButton(top_frame, text="注销/切换账号", command=self.logout, width=100, height=24, font=customtkinter.CTkFont(size=10), fg_color="transparent", border_width=1, text_color=("gray10", "gray90"))
         logout_btn.pack(side=LEFT, padx=5, pady=5)
         self.sound_enabled_var = BooleanVar(value=True)
@@ -152,9 +174,14 @@ class SmsApp(customtkinter.CTk):
         self.listen_phone_entry = customtkinter.CTkEntry(top_frame, width=120, placeholder_text="输入号码")
         self.listen_phone_entry.pack(side=LEFT, padx=(0, 5), pady=5)
         self.listen_btn = customtkinter.CTkButton(top_frame, text="开始监听", command=self.start_listen_specific_phone, width=100, state=DISABLED)
-        self.listen_btn.pack(side=LEFT, padx=(0, 20), pady=5)
+        self.listen_btn.pack(side=LEFT, padx=(0, 10), pady=5) # 稍微调整间距
         self.get_phone_btn = customtkinter.CTkButton(top_frame, text="获取新号码", command=self.start_get_phone_thread, width=120, state=DISABLED)
         self.get_phone_btn.pack(side=LEFT, padx=5, pady=5)
+        # --- 新增：释放全部按钮 ---
+        self.release_all_btn = customtkinter.CTkButton(top_frame, text="释放全部", command=self.start_release_all_phones_thread, width=100, state=DISABLED, fg_color="orange", hover_color="darkorange")
+        self.release_all_btn.pack(side=LEFT, padx=5, pady=5)
+        # --- 结束新增 ---
+
         user_info_frame = customtkinter.CTkFrame(top_frame, fg_color="transparent")
         user_info_frame.pack(side=RIGHT, padx=5, pady=5)
         self.username_var = StringVar(value="未登录");
@@ -198,6 +225,7 @@ class SmsApp(customtkinter.CTk):
         status_bar = customtkinter.CTkLabel(self, textvariable=self.status_var, height=25, anchor="w", padx=10)
         status_bar.grid(row=4, column=0, sticky=EW)
 
+    # ... (add_phone_entry_widget, remove_phone_entry_widget, _update_row_colors, update_phone_entry_status 保持不变) ...
     def add_phone_entry_widget(self, phone_info):
         phone = phone_info['phone']
         if phone in self.phone_widgets: return
@@ -206,36 +234,28 @@ class SmsApp(customtkinter.CTk):
         widget.pack(fill=X, padx=5, pady=(1, 1))
         self.phone_widgets[phone] = widget
         self._update_row_colors()
-
     def remove_phone_entry_widget(self, phone):
         widget = self.phone_widgets.pop(phone, None)
         if widget:
             widget.destroy()
             self._update_row_colors()
-
     def _update_row_colors(self):
         visible_widgets = []
-        # 使用 pack 布局时获取子控件可能不按顺序，改为迭代 self.phone_widgets 的值
-        # 需要确保 active_phones 和 phone_widgets 的顺序或对应关系正确
-        # 一个更可靠的方式是直接迭代 phone_list_scrollable_frame 的子控件
         for child in self.phone_list_scrollable_frame.winfo_children():
-             if isinstance(child, PhoneEntryWidget):
-                 visible_widgets.append(child)
-
-        # 重新排序以防万一 (基于它们在 active_phones 中的顺序)
-        # sorted_widgets = sorted(visible_widgets, key=lambda w: self.active_phones.index(w.phone_info) if w.phone_info in self.active_phones else float('inf'))
-
-        for i, widget in enumerate(visible_widgets): # 直接使用获取到的顺序
+             if isinstance(child, PhoneEntryWidget): visible_widgets.append(child)
+        for i, widget in enumerate(visible_widgets):
              if i % 2 == 0: widget.configure(fg_color=("gray90", "gray20"))
              else: widget.configure(fg_color=("gray80", "gray15"))
-
     def update_phone_entry_status(self, phone, status, code=None):
         widget = self.phone_widgets.get(phone)
         if widget:
             widget.update_status(status)
             if code is not None: widget.update_code(code)
-            if status in ["已拉黑", "获取超时", "获取失败", "拉黑失败", "拉黑异常", "获取异常", "已中断"]: widget.disable_actions()
+            if status in ["已拉黑", "获取超时", "获取失败", "拉黑失败", "拉黑异常", "获取异常", "已中断", "已释放", "释放失败"]: # 添加释放状态
+                widget.disable_actions()
 
+
+    # ... (on_login_success, attempt_auto_login 保持不变) ...
     def on_login_success(self, user_id, username, remaining_uses, project_id, project_name, remember=False, password=None, auto_login=False):
         self.logged_in_user_id = user_id; self.logged_in_username = username;
         self.current_project_id = project_id; self.current_project_name = project_name or self.default_title
@@ -305,7 +325,9 @@ class SmsApp(customtkinter.CTk):
         except keyring.errors.KeyringError: return False
         except Exception: return False
 
+
     # --- 日志、状态、UI 更新 ---
+    # ... (保持不变) ...
     def log_message(self, message, level="INFO"):
         if level == "INFO" and self: self.after(0, self._append_log, message)
     def _append_log(self, message):
@@ -327,10 +349,15 @@ class SmsApp(customtkinter.CTk):
         can_get_phone = is_logged_in and not working_global and self.remaining_uses > 0 and self.current_project_id
         get_phone_state = NORMAL if can_get_phone else DISABLED
         listen_state = NORMAL if can_get_phone else DISABLED # 监听按钮状态与获取按钮一致
+        # --- 修改：释放全部按钮状态 ---
+        can_release_all = is_logged_in and not working_global and len(self.active_phones) > 0
+        release_all_state = NORMAL if can_release_all else DISABLED
+        # --- 结束修改 ---
 
         try:
             self.get_phone_btn.configure(state=get_phone_state)
-            self.listen_btn.configure(state=listen_state) # 更新监听按钮状态
+            self.listen_btn.configure(state=listen_state)
+            self.release_all_btn.configure(state=release_all_state) # 设置释放全部按钮状态
             if not is_logged_in: self.set_status("请先登录.")
             else:
                 current_status = self.status_var.get()
@@ -343,50 +370,36 @@ class SmsApp(customtkinter.CTk):
         except tk.TclError: pass
         except AttributeError: pass
 
+
     # --- 启动后台任务的方法 ---
     def start_initial_login_thread(self):
         self.set_status("正在初始化 API 连接...")
         thread = threading.Thread(target=self._initial_login_task, daemon=True); thread.start()
-
     def start_get_phone_thread(self):
-        """获取一个新的随机手机号"""
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
         if self.is_working_global: self.log_message("提示：请等待当前操作完成。"); return
         if self.remaining_uses <= 0: messagebox.showwarning("次数不足", "您的剩余使用号码数量不足，请联系管理员充值。"); self.log_message("可用号码数量不足，请联系管理员充值。"); return
         if not self.current_project_id: messagebox.showerror("错误", "当前用户未配置项目"+ADMIN_CONTACT_MSG); self.log_message("错误：未配置项目，无法获取号码。", level="ERROR"); return
         if not self.token or not self.server: messagebox.showerror("错误", "API 连接未就绪"+ADMIN_CONTACT_MSG); return
-
         self.update_ui_state(True)
         self.log_message(f"开始获取手机号 (项目ID: {self.current_project_id}, 剩余: {self.remaining_uses})...")
-        # 启动后台任务，不传递指定号码 (None)
         thread = threading.Thread(target=self._get_phone_task, args=(None,), daemon=True); thread.start()
-
     def start_listen_specific_phone(self):
-        """开始监听用户指定的手机号码"""
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
         if self.is_working_global: self.log_message("提示：请等待当前操作完成。"); return
         if self.remaining_uses <= 0: messagebox.showwarning("次数不足", "您的剩余使用号码数量不足，请联系管理员充值。"); self.log_message("可用号码数量不足，请联系管理员充值。"); return
         if not self.current_project_id: messagebox.showerror("错误", "当前用户未配置项目"+ADMIN_CONTACT_MSG); self.log_message("错误：未配置项目，无法监听号码。", level="ERROR"); return
         if not self.token or not self.server: messagebox.showerror("错误", "API 连接未就绪"+ADMIN_CONTACT_MSG); return
-
         specified_phone = self.listen_phone_entry.get().strip()
-        if not specified_phone or not specified_phone.isdigit():
-            messagebox.showwarning("输入错误", "请输入有效的手机号码（只包含数字）。")
-            return
-        if specified_phone in self.phone_widgets:
-            messagebox.showinfo("提示", f"号码 {specified_phone} 已在监听列表中。")
-            return
-
-        # 暂不设置全局忙碌，因为只是添加条目和启动监听，不影响获取新号码
-        # self.update_ui_state(True)
+        if not specified_phone or not specified_phone.isdigit(): messagebox.showwarning("输入错误", "请输入有效的手机号码（只包含数字）。"); return
+        if specified_phone in self.phone_widgets: messagebox.showinfo("提示", f"号码 {specified_phone} 已在监听列表中。"); return
         self.log_message(f"开始监听指定号码: {specified_phone} (项目ID: {self.current_project_id})...")
-
         phone_info = {'phone': specified_phone, 'status': '开始监听...', 'code': None, 'project_id': self.current_project_id, 'thread': None, 'stop_event': None}
         self.active_phones.append(phone_info)
         self.after(0, self.add_phone_entry_widget, phone_info)
-        self.start_individual_code_fetch(phone_info) # 启动监听线程
-
-        self.listen_phone_entry.delete(0, END) # 清空输入框
+        self.start_individual_code_fetch(phone_info)
+        self.listen_phone_entry.delete(0, END)
+        # self.after(100, lambda: self.update_ui_state(False)) # 监听不设全局忙碌
 
     def start_individual_code_fetch(self, phone_info):
         phone = phone_info['phone']
@@ -397,20 +410,49 @@ class SmsApp(customtkinter.CTk):
         phone_info['thread'] = thread
         thread.start()
 
-    def start_blacklist_specific_phone(self, phone_info):
+    def start_release_specific_phone(self, phone_info): # 新增：释放单个
         phone = phone_info['phone']
         if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
-        if phone_info.get('status') == '已拉黑': return
+        if phone_info.get('status') in ['已释放', '已拉黑', '释放失败', '拉黑失败']: return # 避免重复操作
+
+        stop_event = phone_info.get('stop_event')
+        if stop_event: stop_event.set() # 停止等待验证码
+
+        self.log_message(f"尝试释放号码: {phone} (项目ID: {self.current_project_id})")
+        self.after(0, self.update_phone_entry_status, phone, "正在释放...")
+        thread = threading.Thread(target=self._release_specific_task, args=(phone_info,), daemon=True)
+        thread.start()
+
+    def start_blacklist_specific_phone(self, phone_info): # 保留拉黑单个
+        phone = phone_info['phone']
+        if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
+        if phone_info.get('status') in ['已释放', '已拉黑', '释放失败', '拉黑失败']: return
+
         stop_event = phone_info.get('stop_event')
         if stop_event: stop_event.set()
+
         if messagebox.askyesno("确认", f"确定要拉黑号码 {phone} 吗？", parent=self.phone_widgets.get(phone)):
             self.log_message(f"尝试拉黑号码: {phone} (项目ID: {self.current_project_id})")
             self.after(0, self.update_phone_entry_status, phone, "正在拉黑...")
             thread = threading.Thread(target=self._blacklist_specific_task, args=(phone_info,), daemon=True)
             thread.start()
         else:
-            if stop_event: stop_event.clear()
+            if stop_event: stop_event.clear() # 用户取消，清除停止标志
             self.log_message(f"取消拉黑号码: {phone}")
+
+    def start_release_all_phones_thread(self): # 新增：释放全部
+        if not self.logged_in_user_id: messagebox.showerror("错误", "请先登录。"); return
+        if self.is_working_global: self.log_message("提示：请等待当前操作完成。"); return
+        if not self.active_phones: messagebox.showinfo("提示", "当前没有可释放的号码。"); return
+
+        if messagebox.askyesno("确认", "确定要释放所有当前获取的号码吗？"):
+            self.update_ui_state(True) # 设置全局忙碌
+            self.log_message("开始释放所有号码...")
+            thread = threading.Thread(target=self._release_all_task, daemon=True)
+            thread.start()
+        else:
+            self.log_message("取消释放全部号码。")
+
 
     # --- 后台任务方法 ---
     def _initial_login_task(self):
@@ -421,12 +463,10 @@ class SmsApp(customtkinter.CTk):
             self.log_message(GENERIC_ERROR_MSG, level="ERROR")
             self.after(0, lambda: messagebox.showerror("API 错误", "无法初始化接码服务"+ADMIN_CONTACT_MSG))
             self.set_status("API 连接失败"+ADMIN_CONTACT_MSG)
-
-    def _get_phone_task(self, specified_phone=None): # 接收指定号码参数
-        """获取单个手机号（随机或指定）并启动其验证码监听"""
+    def _get_phone_task(self, specified_phone=None):
         phone_info = None
         try:
-            phone = self.get_phone_number(specified_phone=specified_phone) # 传递指定号码
+            phone = self.get_phone_number(specified_phone=specified_phone)
             if phone:
                 if specified_phone and phone != specified_phone:
                     self.log_message(f"警告：指定号码 {specified_phone} 不可用，获取到号码 {phone}。", level="WARN")
@@ -435,19 +475,17 @@ class SmsApp(customtkinter.CTk):
                 self.after(0, self.add_phone_entry_widget, phone_info)
                 self._play_sound_if_enabled(SUCCESS_SOUND_ALIAS)
                 self.log_message(f"号码 {phone} 获取成功，开始接收验证码...")
-                self.start_individual_code_fetch(phone_info) # 启动监听
-            else: # 获取号码失败
+                self.start_individual_code_fetch(phone_info)
+            else:
                  log_msg = "获取新号码失败。"
                  if specified_phone: log_msg = f"获取指定号码 {specified_phone} 失败。"
                  self.log_message(log_msg)
-                 # 对于获取失败，不再弹窗，仅记录日志
-                 # self.after(0, lambda: messagebox.showwarning("获取失败", log_msg + "\n请检查号码是否正确或联系管理员。"))
+                 # self.after(0, lambda: messagebox.showwarning("获取失败", log_msg + "\n请检查号码是否正确或联系管理员。")) # 移除弹窗
         except Exception:
             self.log_message(GENERIC_ERROR_MSG, level="ERROR")
             self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG))
         finally:
-            self.after(0, self.update_ui_state, False) # 释放全局忙碌状态
-
+            self.after(0, self.update_ui_state, False)
     def _get_individual_code_task(self, phone_info):
         phone = phone_info['phone']; project_id = phone_info['project_id']; stop_event = phone_info['stop_event']
         code = None; success = False
@@ -465,8 +503,6 @@ class SmsApp(customtkinter.CTk):
                 self.log_message(f"号码 {phone} 验证码获取超时。")
                 self.after(0, self.update_phone_entry_status, phone, "获取超时")
                 # 超时后不再自动拉黑
-                # self.log_message(f"自动拉黑号码: {phone}")
-                # self.blacklist_phone(phone, project_id)
         except Exception:
             self.after(0, self.update_phone_entry_status, phone, "获取异常")
             self.log_message(GENERIC_ERROR_MSG, level="ERROR")
@@ -474,6 +510,27 @@ class SmsApp(customtkinter.CTk):
             # 从 active_phones 移除处理完成的条目
             try: self.active_phones.remove(phone_info)
             except ValueError: pass
+
+    def _release_specific_task(self, phone_info): # 新增：释放单个后台任务
+        """后台执行特定号码的释放操作"""
+        phone = phone_info['phone']; project_id = phone_info['project_id']
+        try:
+            success = self.release_phone(phone, project_id) # 调用释放 API
+            if success:
+                self.after(0, self.update_phone_entry_status, phone, "已释放")
+                try: self.active_phones.remove(phone_info)
+                except ValueError: pass
+                self.after(0, self._update_row_colors)
+            else:
+                self.after(0, self.update_phone_entry_status, phone, "释放失败")
+                # 释放失败，清除停止标志，允许重试或拉黑
+                stop_event = phone_info.get('stop_event')
+                if stop_event: stop_event.clear()
+        except Exception:
+             self.log_message(GENERIC_ERROR_MSG, level="ERROR")
+             self.after(0, self.update_phone_entry_status, phone, "释放异常")
+             stop_event = phone_info.get('stop_event')
+             if stop_event: stop_event.clear()
 
     def _blacklist_specific_task(self, phone_info):
         phone = phone_info['phone']; project_id = phone_info['project_id']
@@ -494,7 +551,40 @@ class SmsApp(customtkinter.CTk):
              stop_event = phone_info.get('stop_event')
              if stop_event: stop_event.clear()
 
+    def _release_all_task(self): # 新增：释放全部后台任务
+        """后台执行释放全部号码的操作"""
+        try:
+            success = self.release_all_phones()
+            if success:
+                self.log_message("已请求释放所有号码。")
+                # 清理界面和状态
+                self.after(0, self.clear_all_phone_entries)
+            else:
+                # 失败日志和弹窗已在 release_all_phones 中处理
+                pass
+        except Exception:
+             self.log_message(GENERIC_ERROR_MSG, level="ERROR")
+             self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG))
+        finally:
+            self.after(0, self.update_ui_state, False) # 释放全局忙碌
+
+    def clear_all_phone_entries(self):
+        """清理所有号码列表的 UI 和内部状态"""
+        # 停止所有等待线程
+        for phone_info in self.active_phones:
+            stop_event = phone_info.get('stop_event')
+            if stop_event: stop_event.set()
+        # 销毁所有 widget
+        for widget in self.phone_widgets.values():
+            widget.destroy()
+        # 清空列表和字典
+        self.phone_widgets.clear()
+        self.active_phones.clear()
+        self.stop_events.clear() # 如果使用了 self.stop_events
+        self._update_row_colors() # 更新背景（虽然是空的）
+
     # --- 数据库交互方法 ---
+    # ... (_get_db_connection, _decrement_usage 保持不变) ...
     def _get_db_connection(self):
         last_error = None
         for attempt in range(DB_RETRY_COUNT):
@@ -528,7 +618,9 @@ class SmsApp(customtkinter.CTk):
             if cursor: cursor.close()
             if conn and conn.is_connected(): conn.close()
 
+
     # --- 本地缓存方法 ---
+    # ... (保持不变) ...
     def _encode_uses(self, uses):
         try: return base64.b64encode(str(uses).encode('utf-8')).decode('utf-8')
         except: return None
@@ -553,7 +645,9 @@ class SmsApp(customtkinter.CTk):
             if os.path.exists(CACHE_FILE): os.remove(CACHE_FILE)
         except OSError: pass
 
-    # --- API 交互方法 (get_phone_number 恢复) ---
+
+    # --- API 交互方法 ---
+    # ... (try_login, handle_api_error, get_phone_number, wait_for_verification_code, blacklist_phone 保持不变) ...
     def try_login(self):
         for s in SERVERS:
             login_url = f"{s}/sms/?api=login&user={API_ACCOUNT}&pass={API_PASSWORD}"
@@ -572,58 +666,36 @@ class SmsApp(customtkinter.CTk):
         if str(error_code) == TOKEN_EXPIRED_ERROR_CODE:
             try: self.try_login(); return True
             except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("API 错误", "API 令牌过期且无法自动重新登录"+ADMIN_CONTACT_MSG)); return False
+        # --- 修改：对于释放/拉黑接口，code=200 也算成功 ---
+        if operation_name.startswith("释放") or operation_name.startswith("拉黑"):
+            if str(error_code) == "200": return True # 认为 200 也是成功
+        # --- 结束修改 ---
         if error_code != 0 and str(error_code) != "0" and not is_waiting_msg and str(error_code) != TOKEN_EXPIRED_ERROR_CODE: return False
         return True
-
-    def get_phone_number(self, specified_phone=None): # 添加参数，但主要用于随机获取
-        """获取手机号，优先随机，如果指定号码则尝试获取指定号码"""
+    def get_phone_number(self, specified_phone=None):
         if not self.token or not self.server: self.log_message("API 未初始化"+ADMIN_CONTACT_MSG, level="ERROR"); return None
         if not self.current_project_id: self.log_message("未配置项目"+ADMIN_CONTACT_MSG, level="ERROR"); return None
-
         base_url = f"{self.server}/sms/"
         params = {"api": "getPhone", "token": self.token, "sid": self.current_project_id}
-        # --- 修改：如果指定了号码，添加到参数中 ---
-        if specified_phone:
-            params["phone"] = specified_phone
-        # --- 结束修改 ---
+        if specified_phone: params["phone"] = specified_phone
         url = f"{base_url}?{urlencode(params, quote_via=quote)}"
-
-        # --- 修改：不再无限重试，只尝试一次 ---
         try:
             response = requests.get(url, headers=headers, timeout=20, verify=True)
             data = response.json(); code = data.get("code"); msg = data.get("msg", "")
-
             if code == 0 or str(code) == "0":
                 phone = data.get("phone")
-                if phone:
-                    # 如果指定了号码，验证返回的是否一致
-                    if specified_phone and phone != specified_phone:
-                        self.log_message(f"警告：指定号码 {specified_phone} 不可用或不属于项目，获取到号码 {phone}。", level="WARN")
-                        # 返回实际获取到的号码 (或者可以返回 None 表示指定失败)
-                        # return None # 如果严格要求必须是指定号码
-                    return phone # 返回获取到的号码
-                else:
-                    self.log_message("API 未返回号码"); return None
-            elif str(code) == "-1": # 处理各种失败情况
+                if phone: return phone
+                else: self.log_message("API 未返回号码"); return None
+            elif str(code) == "-1":
                  log_msg = f"获取号码失败({msg})"
                  if specified_phone and "指定号码" in msg: log_msg = f"指定号码 {specified_phone} 不可用或错误: {msg}"
                  elif "没有可用手机号" in msg or "请稍后再试" in msg or "等待" == msg: log_msg = f"暂时无号或需等待({msg})"
                  self.log_message(log_msg); return None
-            else: # 其他 API 错误
-                if self.handle_api_error(data, "获取手机号"):
-                    self.log_message("令牌已刷新，请重试获取号码。") # 提示用户重试
-                    return None
-                else: # 无法处理的 API 错误
-                    self.log_message(GENERIC_ERROR_MSG, level="ERROR")
-                    self.after(0, lambda: messagebox.showerror("API 错误", "获取手机号失败"+ADMIN_CONTACT_MSG))
-                    return None
-        except requests.exceptions.RequestException:
-            self.log_message("获取手机号网络错误"+ADMIN_CONTACT_MSG, level="ERROR"); return None
-        except Exception:
-            self.log_message(GENERIC_ERROR_MSG, level="ERROR");
-            self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); return None
-        # --- 结束修改 ---
-
+            else:
+                if self.handle_api_error(data, "获取手机号"): self.log_message("令牌已刷新，请重试获取号码。"); return None
+                else: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("API 错误", "获取手机号失败"+ADMIN_CONTACT_MSG)); return None
+        except requests.exceptions.RequestException: self.log_message("获取手机号网络错误"+ADMIN_CONTACT_MSG, level="ERROR"); return None
+        except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); return None
     def wait_for_verification_code(self, phone, project_id, stop_event, timeout=200):
         if not self.token or not self.server: return None
         start_time = time.time(); polling_interval = 4
@@ -647,13 +719,59 @@ class SmsApp(customtkinter.CTk):
             except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); return None
             time.sleep(polling_interval)
         return None # Timeout
+
+    def release_phone(self, phone, project_id): # 新增：释放单个 API
+        """调用 API 释放指定手机号"""
+        if not self.token or not self.server: return False
+        url = f"{self.server}/sms/?api=cancelRecv&token={self.token}&sid={project_id}&phone={phone}"
+        try:
+            response = requests.get(url, headers=headers, timeout=10, verify=True)
+            data = response.json()
+            code = data.get("code")
+            # code=0 或 200 为成功
+            if code == 0 or str(code) == "0" or str(code) == "200":
+                self.log_message(f"号码 {phone} 已成功释放。")
+                return True
+            else:
+                # 尝试处理令牌过期
+                if self.handle_api_error(data, f"释放手机号({phone})"):
+                    return self.release_phone(phone, project_id) # 重试
+                self.log_message(f"释放号码 {phone} 失败: {data.get('msg', '未知错误')}", level="WARN") # 记录为警告
+                return False
+        except requests.exceptions.RequestException: self.log_message("释放号码网络异常"+ADMIN_CONTACT_MSG, level="ERROR"); return False
+        except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); return False
+
+    def release_all_phones(self): # 新增：释放全部 API
+        """调用 API 释放所有号码"""
+        if not self.token or not self.server: return False
+        url = f"{self.server}/sms/?api=cancelAllRecv&token={self.token}"
+        try:
+            response = requests.get(url, headers=headers, timeout=15, verify=True) # 稍长超时
+            data = response.json()
+            code = data.get("code")
+            # code=0 或 200 为成功
+            if code == 0 or str(code) == "0" or str(code) == "200":
+                return True
+            else:
+                if self.handle_api_error(data, "释放全部号码"):
+                    return self.release_all_phones() # 重试
+                self.log_message(f"释放全部号码失败: {data.get('msg', '未知错误')}", level="WARN")
+                messagebox.showwarning("操作失败", "释放全部号码失败"+ADMIN_CONTACT_MSG) # 弹窗提示
+                return False
+        except requests.exceptions.RequestException: self.log_message("释放全部号码网络异常"+ADMIN_CONTACT_MSG, level="ERROR"); messagebox.showerror("网络错误", "释放全部号码操作网络异常"+ADMIN_CONTACT_MSG); return False
+        except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); messagebox.showerror("严重错误", GENERIC_ERROR_MSG); return False
+
     def blacklist_phone(self, phone, project_id):
         if not self.token or not self.server: return False
         url = f"{self.server}/sms/?api=addBlacklist&token={self.token}&sid={project_id}&phone={phone}"
         try:
             response = requests.get(url, headers=headers, timeout=10, verify=True)
             data = response.json()
-            if data.get("code") == 0 or str(data.get("code")) == "0": self.log_message(f"号码 {phone} 已拉黑。"); self.after(0, self.clear_phone_details_ui, phone); return True
+            # code=0 或 200 为成功 (假设拉黑也可能返回200)
+            if data.get("code") == 0 or str(data.get("code")) == "0" or str(data.get("code")) == "200":
+                self.log_message(f"号码 {phone} 已拉黑。")
+                self.after(0, self.clear_phone_details_ui, phone)
+                return True
             else:
                 if self.handle_api_error(data, f"拉黑手机号({phone})"): return self.blacklist_phone(phone, project_id)
                 self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda p=phone: messagebox.showerror("操作失败", f"拉黑号码 {p} 失败"+ADMIN_CONTACT_MSG)); return False
@@ -661,19 +779,22 @@ class SmsApp(customtkinter.CTk):
         except Exception: self.log_message(GENERIC_ERROR_MSG, level="ERROR"); self.after(0, lambda: messagebox.showerror("严重错误", GENERIC_ERROR_MSG)); return False
 
     # --- GUI 辅助方法 ---
+    # ... (copy_text, copy_phone, copy_code, clear_phone_details_ui, _play_sound_if_enabled, _on_app_closing, logout 保持不变) ...
     def copy_text(self, text_to_copy, text_type="文本"):
         if text_to_copy:
             try: pyperclip.copy(text_to_copy); self.log_message(f"{text_type} {text_to_copy} 已复制。"); self.set_status(f"{text_type}已复制。")
             except Exception: self.log_message(f"复制{text_type}失败。")
         else: self.log_message(f"没有{text_type}可复制。")
     def copy_phone(self): # 全局按钮复制最后一个活动号码
-        active_phones = [p['phone'] for p in self.active_phones if p.get('status') != '已拉黑']
+        active_phones = [p['phone'] for p in self.active_phones if p.get('status') not in ['已拉黑', '已释放']]
         if active_phones: self.copy_text(active_phones[-1], "号码")
         else: self.log_message("没有号码可复制。")
     def copy_code(self): # 全局按钮复制最后一个成功获取的验证码
         last_successful_code = None
-        for p_info in reversed(self.active_phones):
-            if p_info.get('status') == '获取成功' and p_info.get('code'): last_successful_code = p_info['code']; break
+        # 筛选出未被拉黑或释放的成功条目
+        active_successful = [p for p in self.active_phones if p.get('status') == '获取成功' and p.get('code')]
+        if active_successful: last_successful_code = active_successful[-1]['code']
+
         if last_successful_code: self.copy_text(last_successful_code, "验证码")
         else: self.log_message("没有有效的验证码可复制。")
     def clear_phone_details_ui(self, phone):
@@ -715,6 +836,7 @@ class SmsApp(customtkinter.CTk):
         self._delete_usage_cache()
         for widget in self.phone_widgets.values(): widget.destroy()
         self.phone_widgets.clear(); self.active_phones.clear()
+        self.stop_events.clear()
         self.title(f"{self.default_title} - 未登录"); self.username_var.set("未登录"); self.uses_var.set("--")
         self.update_ui_state(False)
         self.log_message("用户已注销。"); self.status_var.set("已注销，请登录。")
