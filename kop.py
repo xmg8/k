@@ -138,8 +138,8 @@ class SmsApp(customtkinter.CTk):
         self.protocol("WM_DELETE_WINDOW", self._on_app_closing)
         self.withdraw()
 
-        if not self.attempt_auto_login():
-            self.after(100, self.show_login_window)
+        #if not self.attempt_auto_login():
+            #self.after(100, self.show_login_window)
 
     def _create_main_widgets(self):
         self.grid_columnconfigure(0, weight=1)
@@ -951,5 +951,17 @@ if __name__ == "__main__":
     try: import pyperclip
     except ImportError: messagebox.showerror("缺少库", "运行本程序需要安装 pyperclip 库。\n请运行: pip install pyperclip"); sys.exit(1)
     if not test_database_connection(): sys.exit(1)
-    app = SmsApp()
-    app.mainloop()
+
+    app = SmsApp() # 创建 App 实例
+
+    # --- 修改：在 mainloop 启动前判断是否需要显示登录窗口 ---
+    show_login_on_start = True # 默认需要显示
+    if app.attempt_auto_login(): # 尝试自动登录
+        show_login_on_start = False # 自动登录成功，不需要显示登录窗口
+
+    if show_login_on_start:
+        # 如果需要显示登录窗口，在 mainloop 启动后安排显示
+        app.after(100, app.show_login_window)
+    # --- 结束修改 ---
+
+    app.mainloop() # 启动事件循环
