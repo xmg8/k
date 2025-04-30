@@ -788,27 +788,56 @@ class SmsApp(customtkinter.CTk):
         self._delete_usage_cache()
         self.destroy()
     def logout(self):
-        if self.is_working_global: messagebox.showwarning("请稍候", "请等待当前操作完成后再注销。"); return
+        """处理注销/切换账号逻辑"""
+        if self.is_working_global:
+            messagebox.showwarning("请稍候", "请等待当前操作完成后再注销。")
+            return
+
+        # --- 停止所有后台线程 ---
         for phone_info in self.active_phones:
             stop_event = phone_info.get('stop_event')
             if stop_event: stop_event.set()
+        # --- 结束停止 ---
+
+        # 清理 keyring
         if self.logged_in_username:
             try:
-                keyring.delete_password(KEYRING_SERVICE_NAME, self.logged_in_username)
+                # 仅清除自动登录标志和最后用户，保留密码以便下次登录填充
+                # keyring.delete_password(KEYRING_SERVICE_NAME, self.logged_in_username) # 不清除密码
                 keyring.delete_password(KEYRING_SERVICE_NAME, "last_user")
                 keyring.delete_password(KEYRING_SERVICE_NAME, "auto_login")
-            except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError): pass
+            except (keyring.errors.KeyringError, keyring.errors.PasswordDeleteError):
+                pass # 忽略错误
+
+        # 清理内存状态
         self.token = None; self.server = None
         self.logged_in_user_id = None; self.logged_in_username = None; self.remaining_uses = 0
         self.current_project_id = None; self.current_project_name = self.default_title
+
+        # 清理缓存
         self._delete_usage_cache()
-        for widget in self.phone_widgets.values(): widget.destroy()
-        self.phone_widgets.clear(); self.active_phones.clear(); self.stop_events.clear()
-        self.title(f"{self.default_title} - 未登录"); self.username_var.set("未登录"); self.uses_var.set("--")
+
+        # 清理号码列表 UI
+        for widget in self.phone_widgets.values():
+            widget.destroy()
+        self.phone_widgets.clear()
+        self.active_phones.clear()
+        # self.stop_events.clear() # stop_events 似乎没有被使用，可以移除或保留
+
+        # 重置 UI
+        self.title(f"{self.default_title} - 未登录")
         self.project_name_var.set(self.default_title) # 重置项目名称显示
-        self.update_ui_state(False)
-        self.log_message("用户已注销。"); self.status_var.set("已注销，请登录。")
-        self.withdraw(); self.show_login_window()
+        self.username_var.set("未登录")
+        self.uses_var.set("--")
+        # phone_var 和 code_var 不需要重置，因为列表清空了
+        self.update_ui_state(False) # 禁用按钮
+        self.log_message("用户已注销。")
+        self.status_var.set("已注销，请登录。")
+
+        # --- 修改：隐藏主窗口并重新安排显示登录窗口 ---
+        self.withdraw() # 隐藏主窗口
+        self.after(10, self.show_login_window) # 安排显示登录窗口
+        # --- 结束修改 ---
 
 
 # --- 登录窗口类 ---
