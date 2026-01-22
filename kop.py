@@ -24,9 +24,9 @@ MYSQL_USER = "wxxmg888" # 替换为你的 MySQL 用户名
 MYSQL_PASSWORD = "xmg888.top" # 替换为你的 MySQL 密码
 MYSQL_DATABASE = "wxxmg888" # 替换为你的数据库名称
 
-# --- 好猪码 API 配置 ---
-API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fba150872eaf35cc85d692b2b209ac61c3"
-API_PASSWORD = "2128c8ba18eba394cbfb99c6c906a9b5199d9f94cd825fbcd30c41a0745281e3"
+# --- API 配置 ---
+API_ACCOUNT = "011474da7ce8c4d4fe58ad3eb95595fb71ab3033c6af810de5ea04c09aac46da"
+API_PASSWORD = "2128c8ba18eba39425931877b984bde7d6ceb6b233d258d4d80301c05631c35e"
 SERVERS = [
     "https://api.haozhuma.com", "https://api.haozhuma.cn",
     "https://api.haozhuyun.com", "https://api.haozhuyun.cn"
